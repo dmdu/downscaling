@@ -51,7 +51,7 @@ class Master(object):
             hostname=self.dns,
             ssh_private_key=self.config.globals.priv_path,
             user='root',
-            command='/bin/bash /root/condor_master.sh')
+            command=self.config.master.script_path)
 
         code = rc.execute()
         if code == 0:
