@@ -47,33 +47,14 @@ class Master(object):
     def contextualize(self):
 
         rc = RemoteCommand(
+            config = self.config,
             hostname=self.dns,
             ssh_private_key=self.config.globals.priv_path,
             user='root',
             command='/bin/bash /root/condor_master.sh')
-        print rc.execute()
-        print rc.stderr
-        print rc.stdout
 
-        time.sleep(10)
-
-        rc = RemoteCommand(
-            hostname=self.dns,
-            ssh_private_key=self.config.globals.priv_path,
-            user='condoruser',
-            command='condor_submit submit')
-        print rc.execute()
-        print rc.stderr
-        print rc.stdout
-
-        time.sleep(20)
-
-        rc = RemoteCommand(
-            hostname=self.dns,
-            ssh_private_key=self.config.globals.priv_path,
-            user='condoruser',
-            command='cat sleep.log')
-        print rc.execute()
-        print rc.stderr
-        print rc.stdout
-
+        code = rc.execute()
+        if code == 0:
+            LOG.info("Master node was contextualized successfully. Remote execution was logged in the remote log file")
+        else:
+            LOG.error("Error occurred during master node's contextualization")
