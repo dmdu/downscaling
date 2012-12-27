@@ -17,7 +17,6 @@ class Master(object):
             sys.exit(1)
         LOG.info("Master node is going to be created in the cloud: %s" % (config.master.cloud))
         self.reservation = self.cloud.boot_image(config.master.image_id, count=1, type=config.master.instance_type)
-
         self.sleep_until_master_ready()
         self.determine_dns()
         self.contextualize()
@@ -58,3 +57,11 @@ class Master(object):
             LOG.info("Master node was contextualized successfully. Remote execution was logged in the remote log file")
         else:
             LOG.error("Error occurred during master node's contextualization")
+
+        rc = RemoteCommand(
+                config = self.config,
+                hostname=self.dns,
+                ssh_private_key=self.config.globals.priv_path,
+                user='condoruser',
+                command='uptime')
+        rc.execute()

@@ -66,7 +66,7 @@ class Cloud(object):
         image_object = self.conn.get_image(image_id)
         boot_result = image_object.run(key_name=self.config.globals.key_name,
             min_count=count, max_count=count, instance_type=type)
-        LOG.info("Attempted to boot an instance. Result: %s" % (boot_result))
+        LOG.info("Attempted to boot instance(s). Result: %s" % (boot_result))
         return boot_result
 
     def is_reservation_ready(self, checked_reservation):

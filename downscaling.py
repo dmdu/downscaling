@@ -11,6 +11,7 @@ from lib.util import read_config
 from lib.config import Config
 from resources.clouds import Clouds
 from resources.master import Master
+from resources.workers import Workers
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
@@ -26,7 +27,8 @@ class Downscaling(Thread):
         #TODO(pdmars): do something
 
         self.clouds = Clouds(self.config)
-        master = Master(self.config, self.clouds)
+        self.master = Master(self.config, self.clouds)
+        self.workers = Workers(self.config, self.clouds, self.master)
 
         self.clouds.selected_terminate()
 
