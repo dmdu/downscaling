@@ -17,7 +17,6 @@ class Master(object):
             sys.exit(1)
         LOG.info("Master node is going to be created in the cloud: %s" % (config.master.cloud))
         self.reservation = self.cloud.boot_image(config.master.image_id, count=1, type=config.master.instance_type)
-
         self.sleep_until_master_ready()
         self.determine_dns()
         self.contextualize()

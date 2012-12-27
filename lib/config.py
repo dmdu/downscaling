@@ -36,26 +36,21 @@ class CloudsConfig(object):
         self.config = read_config(self.file)
         self.list = self.config.sections()
 
-class Benchmark(object):
-    """ Benchmark class retrieves information from one of the section of the benchmarking file """
+class WorkersConfig(object):
 
-    def __init__(self, benchmark_name, config):
-        self.config = config
-        self.name = benchmark_name
-        dict = self.config.items(self.name)
-        self.dict = {}
-        # Form a dictionary out of items in the specified section
-        for pair in dict:
-            self.dict[pair[0]] = pair[1]
+    def __init__(self, file):
+        self.file = file
+        self.config = read_config(self.file)
+        cloud_names = self.config.sections()
 
-class BenchmarkingConfig(object):
-    """ BenchmarkingConfig class retrieves benchmarking information and populates benchmark list """
-
-    def __init__(self, config):
-        self.config = config
-        self.list = list()
-        for sec in self.config.sections():
-            self.list.append(Benchmark(sec, self.config))
+        self.worker_groups = list()
+        for cloud in cloud_names:
+            items = self.config.items(cloud)
+            dict = {'cloud': cloud}
+            # Form a dictionary out of items list
+            for pair in items:
+                dict[pair[0]] = pair[1]
+            self.worker_groups.append(dict)
 
 class Config(object):
     """ Config class retrieves all configuration information """
@@ -67,4 +62,5 @@ class Config(object):
         self.globals = GlobalConfig(options.global_file)
         self.master = MasterConfig(options.master_file)
         self.clouds = CloudsConfig(options.clouds_file)
+        self.workers = WorkersConfig(options.workers_file)
         self.remote_log = options.remote_log

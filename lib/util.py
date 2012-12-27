@@ -140,8 +140,12 @@ def parse_options():
     parser.set_defaults(master_file="etc/master.conf")
 
     parser.add_option("-c", "--clouds_file", action="store", dest="clouds_file",
-        help="Location of the file with cloud parameters (default: etc/clouds.conf).")
+        help="Location of the file with clouds parameters (default: etc/clouds.conf).")
     parser.set_defaults(clouds_file="etc/clouds.conf")
+
+    parser.add_option("-w", "--workers_file", action="store", dest="workers_file",
+        help="Location of the file with workers parameters (default: etc/workers.conf).")
+    parser.set_defaults(workers_file="etc/workers.conf")
 
     parser.add_option("-r", "--remote_log", action="store", dest="remote_log",
         help="Location of the log file for remote command execution (default: log/remote.log).")
