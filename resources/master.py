@@ -57,11 +57,3 @@ class Master(object):
             LOG.info("Master node was contextualized successfully. Remote execution was logged in the remote log file")
         else:
             LOG.error("Error occurred during master node's contextualization")
-
-        rc = RemoteCommand(
-                config = self.config,
-                hostname=self.dns,
-                ssh_private_key=self.config.globals.priv_path,
-                user='condoruser',
-                command='uptime')
-        rc.execute()
