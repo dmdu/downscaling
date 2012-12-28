@@ -24,7 +24,7 @@ class Downscaling(Thread):
 
     def run(self):
         LOG.info("Starting Downscaling")
-        #TODO(pdmars): do something
+        #TODO(dmdu): do something
 
         self.clouds = Clouds(self.config)
         self.master = Master(self.config, self.clouds)
