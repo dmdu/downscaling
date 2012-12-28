@@ -23,10 +23,10 @@ class Master(object):
 
     def sleep_until_master_ready(self, sleep_period_sec=5):
 
-        LOG.info("Waiting until master reservation is ready")
+        LOG.info("Waiting until master node is running")
         while not self.cloud.is_reservation_ready(self.reservation):
             time.sleep(sleep_period_sec)
-        LOG.info("Master reservation is ready now")
+        LOG.info("Master reservation is running now")
 
     def determine_dns(self):
 
@@ -47,13 +47,13 @@ class Master(object):
 
         rc = RemoteCommand(
             config = self.config,
-            hostname=self.dns,
-            ssh_private_key=self.config.globals.priv_path,
-            user='root',
-            command=self.config.master.script_path)
+            hostname = self.dns,
+            ssh_private_key = self.config.globals.priv_path,
+            user = 'root',
+            command = self.config.master.script_path)
 
         code = rc.execute()
         if code == 0:
-            LOG.info("Master node was contextualized successfully. Remote execution was logged in the remote log file")
+            LOG.info("Master node was contextualized successfully. Details are in remote log file")
         else:
             LOG.error("Error occurred during master node's contextualization")
