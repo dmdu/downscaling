@@ -88,7 +88,8 @@ class Clouds(object):
         self.config = config
         self.list = list()
         for cloud_name in self.config.clouds.list:
-            self.list.append(Cloud(cloud_name, self.config))
+            cloud = Cloud(cloud_name, self.config)
+            self.list.append(cloud)
 
     def lookup_by_name(self, name):
         """ Finds a cloud in the collection with a given name; if does not exist, returns None """
