@@ -58,7 +58,8 @@ class Master(object):
                         master_selected = True
                         self.reservation = reservation
                         self.determine_dns()
-                        self.contextualize()
+                        # Decided not to recontextualize master nodes (assume they have been contextualized previously)
+                        #self.contextualize()
                         break
                 if master_selected == False:
                     print("Master node has not been selected. Looping through the list of existing reservations again.")
