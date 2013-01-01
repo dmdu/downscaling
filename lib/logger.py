@@ -1,4 +1,5 @@
 import logging
+import datetime
 
 def configure_logging(debug=False):
     formatter = logging.Formatter("%(asctime)s - %(name)-16s - "
@@ -10,3 +11,10 @@ def configure_logging(debug=False):
         logging.getLogger('').setLevel(logging.DEBUG)
     else:
         logging.getLogger('').setLevel(logging.INFO)
+
+
+def filelog(file_name, message):
+
+    timestamp = datetime.datetime.now()
+    with open(file_name, "a") as log:
+        log.write("%s %s\n" % (timestamp, message))

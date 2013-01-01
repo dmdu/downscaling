@@ -103,6 +103,10 @@ class Clouds(object):
 
         terminate = raw_input( "Would you like to terminate running instances now? (Y/N)\n" )
         if is_yes(terminate):
+
+            for cloud in self.list:
+                cloud.connect()
+
             for cloud in self.list:
                 if cloud.conn != None:
                     for reservation in cloud.conn.get_all_instances():
@@ -115,3 +119,6 @@ class Clouds(object):
                             LOG.info("Terminated instance: %s" % (instance.id))
                         else:
                             LOG.info("Instance \"%s\" is left running" % (instance.id))
+
+            for cloud in self.list:
+                cloud.conn = None

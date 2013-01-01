@@ -39,3 +39,4 @@ nosetests.xml
 
 #Logs
 log/remote.log
+log/node.log

@@ -52,6 +52,16 @@ class WorkersConfig(object):
                 dict[pair[0]] = pair[1]
             self.worker_groups.append(dict)
 
+class WorkloadConfig(object):
+
+    def __init__(self, file):
+        self.file = file
+        self.config = read_config(self.file)
+        default_dict = self.config.defaults()
+        self.user = default_dict['user']
+        self.submit_local = default_dict['submit_local']
+        self.submit_remote = default_dict['submit_remote']
+
 class Config(object):
     """ Config class retrieves all configuration information """
 
@@ -63,4 +73,6 @@ class Config(object):
         self.master = MasterConfig(options.master_file)
         self.clouds = CloudsConfig(options.clouds_file)
         self.workers = WorkersConfig(options.workers_file)
+        self.workload = WorkloadConfig(options.workload_file)
         self.remote_log = options.remote_log
+        self.node_log = options.node_log
