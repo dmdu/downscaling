@@ -4,12 +4,11 @@ import socket
 import tempfile
 import os
 import time
-import datetime
 
 from ConfigParser import SafeConfigParser
 from optparse import OptionParser
 from fabric import api as fabric_api
-
+from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 
@@ -64,10 +63,8 @@ class RemoteCommand(object):
 
     def execute(self):
 
-        self.timestamp = datetime.datetime.now()
-        with open(self.remote_log, "a") as log:
-            log.write("%s Host: %s, User: %s, CMD: %s\n" %
-                      (self.timestamp, self.hostname, self.user, self.command))
+        filelog(self.remote_log, "Host: %s, User: %s, CMD: %s" %
+                                 (self.hostname, self.user, self.command))
 
         if os.path.isfile(self.ssh_private_key):
             context = fabric_api.settings(fabric_api.hide('running', 'stdout', 'stderr', 'warnings'),
@@ -93,9 +90,8 @@ class RemoteCommand(object):
                     self.stdout = results.stdout
                     self.stderr = results.stderr
 
-                    with open(self.remote_log, "a") as log:
-                        log.write("Error: %s\n" % (self.stderr))
-                        log.write("Output: %s\n\n" % (self.stdout))
+                    filelog(self.remote_log, "Error: %s" % (self.stderr))
+                    filelog(self.remote_log, "Output: %s" % (self.stdout))
 
                     return results.return_code
                 except Exception as expt:
@@ -147,9 +143,17 @@ def parse_options():
         help="Location of the file with workers parameters (default: etc/workers.conf).")
     parser.set_defaults(workers_file="etc/workers.conf")
 
+    parser.add_option("-l", "--workload_file", action="store", dest="workload_file",
+        help="Location of the file with workload parameters (default: etc/workload.conf).")
+    parser.set_defaults(workload_file="etc/workload.conf")
+
     parser.add_option("-r", "--remote_log", action="store", dest="remote_log",
         help="Location of the log file for remote command execution (default: log/remote.log).")
     parser.set_defaults(remote_log="log/remote.log")
+
+    parser.add_option("-n", "--node_log", action="store", dest="node_log",
+        help="Location of the node log file (default: log/node.log).")
+    parser.set_defaults(node_log="log/node.log")
 
     (options, args) = parser.parse_args()
     return (options, args)
@@ -217,3 +221,9 @@ def is_executable_file(file_path):
 def is_yes(input):
 
     return (input == 'Y' or input == 'y' or input == 'Yes' or input == 'yes')
+
+def printfile(file_name):
+
+    with open(file_name, "r") as file:
+        text = file.read()
+        print text

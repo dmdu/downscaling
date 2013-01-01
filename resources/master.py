@@ -3,7 +3,8 @@ import sys
 import time
 
 from lib.util import RemoteCommand
-from lib.util import is_yes
+from lib.util import is_yes, printfile
+from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 
@@ -35,10 +36,13 @@ class Master(object):
             self.reservation = self.cloud.boot_image(config.master.image_id, count=1, type=config.master.instance_type)
             self.sleep_until_master_ready()
             self.determine_dns()
+            filelog(self.config.node_log, "CREATED MASTER cloud: %s, reservation: %s, instance: %s, dns: %s" %
+                                          (self.cloud.name, self.reservation.id, self.instance_id, self.dns))
             self.contextualize()
         else:
             LOG.info("One of the existing instances in cloud \"%s\" is going to be reused as a master node"
                      % (self.cloud.name))
+            printfile(self.config.node_log)
             self.cloud.connect()
             master_selected = False
             while master_selected == False:
@@ -58,6 +62,10 @@ class Master(object):
                         master_selected = True
                         self.reservation = reservation
                         self.determine_dns()
+
+                        filelog(self.config.node_log, "REUSED MASTER cloud: %s, reservation: %s, instance: %s, dns: %s" %
+                                                      (self.cloud.name, self.reservation.id, self.instance_id, self.dns))
+
                         # Decided not to recontextualize master nodes (assume they have been contextualized previously)
                         #self.contextualize()
                         break
@@ -75,7 +83,9 @@ class Master(object):
 
         instances = self.reservation.instances
         if len(instances) == 1:
-            self.dns = (instances[0]).public_dns_name
+            instance = instances[0]
+            self.dns = instance.public_dns_name
+            self.instance_id = instance.id
             LOG.info("Determined master node's public DNS name: %s" % (self.dns))
         else:
             LOG.error("There should not be more than 1 master node")

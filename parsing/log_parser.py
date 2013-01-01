@@ -87,8 +87,8 @@ class CondorParser(object):
                 file_obj.write("Arguments = %d\nQueue\n" % (int(elapsed_time)))
 
 # Usage Note :
-#TEST_FILE = "/Users/ali/Downloads/first_pass.log"
-#cp = CondorParser(TEST_FILE)
-#cp.parse_file()
-#cp.show()
-#cp.create_submitfile("/tmp/sub.txt")
+log_file = "condor.log"
+cp = CondorParser(log_file)
+cp.parse_file()
+cp.show()
+cp.create_submitfile("condor.submit")

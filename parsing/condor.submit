@@ -1,0 +1,7 @@
+Universe = vanilla
+Executable = sleep
+Log = sleep.log
+Output = sleep.out
+Error = sleep.error
+Arguments = 60
+Queue 60
