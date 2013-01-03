@@ -15,6 +15,7 @@ from resources.workers import Workers
 from resources.workload import Workload
 from resources.monitor import Monitor
 from resources.failuresimulator import FailureSimulator
+from resources.initialmonitor import InitialMonitor
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
@@ -30,28 +31,43 @@ class Downscaling(Thread):
         LOG.info("Starting Downscaling")
         #TODO(dmdu): do something
 
+        # Get information about available clouds
         self.clouds = Clouds(self.config)
 
+        # Potentially terminate some instances from the previous experiment
         self.clouds.selected_terminate()
 
-
+        # Launch master and worker nodes
         self.master = Master(self.config, self.clouds)
         self.workers = Workers(self.config, self.clouds, self.master)
+
+        # Wait until all workers register with master (as Idle resources)
+        self.initialmonitor = InitialMonitor(self.config, self.master, self.workers.count)
+        self.initialmonitor.start()
+        self.initialmonitor.join()
+
+        # Submit and execute workload
         self.workload = Workload(self.config, self.master)
         self.workload.execute()
 
+        # Launch monitor and failure simulator
         self.monitor = Monitor(self.config, self.master)
         self.monitor.start()
         self.failuresimulator_stop= Event()
         self.failuresimulator = FailureSimulator(self.failuresimulator_stop, self.config, self.workers)
         self.failuresimulator.start()
 
+        # Sleep while the monitor is running (while there are jobs in the queue)
+        # Terminate failure simulator then
         while self.monitor.isAlive():
             time.sleep(5)
-
         if self.failuresimulator.isAlive():
             self.failuresimulator_stop.set()
 
+        # Copy the master log back
+        self.workload.get_log()
+
+        # Terminate some instances
         self.clouds.selected_terminate()
 
 def clean_exit(signum, frame):

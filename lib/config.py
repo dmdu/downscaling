@@ -61,6 +61,7 @@ class WorkloadConfig(object):
         self.user = default_dict['user']
         self.submit_local = default_dict['submit_local']
         self.submit_remote = default_dict['submit_remote']
+        self.log_remote = default_dict['log_remote']
 
 class FailureSimulatorConfig(object):
 
