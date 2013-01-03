@@ -63,6 +63,15 @@ class WorkloadConfig(object):
         self.submit_remote = default_dict['submit_remote']
         self.log_remote = default_dict['log_remote']
 
+class FailureSimulatorConfig(object):
+
+    def __init__(self, afile):
+        self.afile = afile
+        self.config = read_config(self.afile)
+        default_dict = self.config.defaults()
+        self.failure_rate = int(default_dict['failure_rate'])
+        self.min_interval = int(default_dict['min_interval'])
+
 class Config(object):
     """ Config class retrieves all configuration information """
 
@@ -75,5 +84,6 @@ class Config(object):
         self.clouds = CloudsConfig(options.clouds_file)
         self.workers = WorkersConfig(options.workers_file)
         self.workload = WorkloadConfig(options.workload_file)
+        self.failuresimulator = FailureSimulatorConfig(options.failuresimulator_file)
         self.remote_log = options.remote_log
         self.node_log = options.node_log
