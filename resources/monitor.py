@@ -39,3 +39,16 @@ class Monitor(Thread):
         rcmd.execute()
         jobs = Jobs(rcmd.stdout, self.config.workload.user)
         return jobs
+
+    def get_current_workers(self):
+
+        command = "condor_status"
+        rcmd = RemoteCommand(
+            config = self.config,
+            hostname = self.master.dns,
+            ssh_private_key = self.config.globals.priv_path,
+            user = self.config.workload.user,
+            command = command)
+        rcmd.execute()
+        jobs = Jobs(rcmd.stdout, self.config.workload.user)
+        return jobs

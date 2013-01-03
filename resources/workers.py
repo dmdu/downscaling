@@ -70,6 +70,7 @@ class Workers(object):
         self.master = master
         self.list = list()
         self.groups = list()
+        self.count = 0
         for group in config.workers.worker_groups:
             cloud = clouds.lookup_by_name(group['cloud'])
             if cloud == None:
@@ -80,6 +81,7 @@ class Workers(object):
                 self.groups.append(wg)
                 for worker in wg.group_list:
                     self.list.append(worker)
+                    self.count += 1
                     LOG.info(
                         'Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s, LaunchTime: %s) added to the list'
                              % (worker.cloud.name, worker.reservation_id, worker.instance_id,
