@@ -155,6 +155,10 @@ def parse_options():
         help="Location of the node log file (default: log/node.log).")
     parser.set_defaults(node_log="log/node.log")
 
+    parser.add_option("-f", "--failuresimulator_file", action="store", dest="failuresimulator_file",
+        help="Location of the file with failure simulator config (default: etc/failuresimulator.conf).")
+    parser.set_defaults(failuresimulator_file="etc/failuresimulator.conf")
+
     (options, args) = parser.parse_args()
     return (options, args)
 
