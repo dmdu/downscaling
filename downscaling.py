@@ -42,7 +42,7 @@ class Downscaling(Thread):
         self.workers = Workers(self.config, self.clouds, self.master)
 
         # Wait until all workers register with master (as Idle resources)
-        self.initialmonitor = InitialMonitor(self.config, self.master, self.workers.count)
+        self.initialmonitor = InitialMonitor(self.config, self.master, len(self.workers.list))
         self.initialmonitor.start()
         self.initialmonitor.join()
 

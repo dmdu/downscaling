@@ -40,6 +40,8 @@ class Master(object):
                                           (self.cloud.name, self.reservation.id, self.instance_id, self.dns))
             self.contextualize()
         else:
+            # Reusing existing master node
+
             LOG.info("One of the existing instances in cloud \"%s\" is going to be reused as a master node"
                      % (self.cloud.name))
             printfile(self.config.node_log)

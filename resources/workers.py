@@ -4,6 +4,8 @@ import time
 import datetime
 
 from lib.util import RemoteCommand
+from lib.util import is_yes, printfile
+from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 
@@ -42,79 +44,171 @@ class Worker(object):
                         instance.terminate()
                         LOG.info("Terminated instance: %s" % (instance.id))
 
-class WorkerGroup(object):
-
-    def __init__(self, config, group, cloud, master):
-
-        self.config = config
-        self.group = group
-        self.cloud = cloud
-        self.master = master
-        initial = int(self.group['initial'])
-        LOG.info("%d worker node(s) is(are) going to be created in the cloud: %s" % (initial, self.cloud.name))
-        self.group_list = list()
-        if initial == 0:
-            self.reservation = None
-        else:
-            self.reservation = self.cloud.boot_image(
-                image_id=self.group['image_id'], count=initial, type=self.group['instance_type'])
-            timestamp = datetime.datetime.now()
-            for instance in self.reservation.instances:
-                self.group_list.append(Worker(config, self.cloud, self.reservation, instance, timestamp))
-
 class Workers(object):
 
     def __init__(self, config, clouds, master):
 
         self.config = config
+        self.clouds = clouds
         self.master = master
         self.list = list()
-        self.groups = list()
-        self.count = 0
-        for group in config.workers.worker_groups:
-            cloud = clouds.lookup_by_name(group['cloud'])
-            if cloud == None:
-                LOG.error('Cloud \"%s\" cannot be found in the clouds config file' % (group['cloud']))
-                sys.exit(1)
-            wg = WorkerGroup(config, group, cloud, master)
-            if wg.reservation != None:
-                self.groups.append(wg)
-                for worker in wg.group_list:
-                    self.list.append(worker)
-                    self.count += 1
-                    LOG.info(
-                        'Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s, LaunchTime: %s) added to the list'
-                             % (worker.cloud.name, worker.reservation_id, worker.instance_id,
-                                worker.dns, worker.launch_time))
+        self.cloud_to_instance_id_list = {}
+        self.cloud_to_instance_dns_list = {}
+
+        decision_made = False
+        create = True
+        while decision_made == False:
+            input = raw_input( "Create new worker node(s) or reuse existing? (C/R)\n" )
+            if input == 'C' or input == 'c' or input == 'Create' or input == 'create':
+                create = True
+                decision_made = True
+            elif input == 'R' or input == 'r' or input == 'Reuse' or input == 'reuse':
+                create = False
+                decision_made = True
+            else:
+                print("Invalid input. Please try again.\n")
+
+        if create:
+
+            LOG.info("Worker nodes are going to be created")
+            for group in self.config.workers.worker_groups:
+                cloud = self.clouds.lookup_by_name(group['cloud'])
+                if cloud == None:
+                    LOG.error("Cloud \"%s\" cannot be found in the clouds config file" % (group['cloud']))
+                    sys.exit(1)
+
+                #wg = WorkerGroup(self.config, group, cloud, master)
+
+                initial = int(group['initial'])
+                LOG.info("Launching %d worker(s) in the cloud %s" % (initial, cloud.name))
+                if initial > 0:
+                    reservation = cloud.boot_image(
+                        image_id=group['image_id'], count=initial, type=group['instance_type'])
+                    timestamp = datetime.datetime.now()
+                    for instance in reservation.instances:
+                        worker = Worker(self.config, cloud, reservation, instance, timestamp)
+                        self.list.append(worker)
+                        LOG.info(
+                            "Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s, LaunchTime: %s) added to the list"
+                            % (worker.cloud.name, worker.reservation_id, worker.instance_id,
+                               worker.dns, worker.launch_time))
+                        filelog(self.config.node_log, "CREATED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s" %
+                                                      (worker.cloud.name, worker.reservation_id, worker.instance_id, worker.dns))
+
+        else:
+            # Reusing existing worker nodes
+
+            LOG.info("Worker nodes are going to be reused")
+            printfile(self.config.node_log)
+
+            for group in self.config.workers.worker_groups:
+                cloud = self.clouds.lookup_by_name(group['cloud'])
+                if cloud == None:
+                    LOG.error("Cloud \"%s\" cannot be found in the clouds config file" % (group['cloud']))
+                    sys.exit(1)
+                initial = int(group['initial'])
+                LOG.info("Need to have %d worker(s) in the cloud %s initially" % (initial, cloud.name))
+
+                count = 0
+                enough = (count == initial)
+                if not enough:
+                    for reservation in cloud.conn.get_all_instances():
+                        if not enough:
+                            for instance in reservation.instances:
+                                if not enough:
+                                    select_instance = raw_input(
+                                        "Select instance \"%s\" of reservation \"%s\" in cloud \"%s\" as a worker node? (Y/N)\n"
+                                        % (instance.id, reservation.id, cloud.name))
+                                    if is_yes(select_instance):
+                                        LOG.info("Instance \"%s\" of reservation \"%s\" in cloud \"%s\" has been selected as a worker node"
+                                                % (instance.id, reservation.id, cloud.name))
+                                        timestamp = datetime.datetime.now()
+                                        worker = Worker(self.config, cloud, reservation, instance, timestamp)
+                                        self.list.append(worker)
+                                        LOG.info(
+                                            "Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s, LaunchTime: %s) added to the list"
+                                            % (worker.cloud.name, worker.reservation_id, worker.instance_id,
+                                            worker.dns, worker.launch_time))
+                                        filelog(self.config.node_log, "REUSED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s" %
+                                                                      (worker.cloud.name, worker.reservation_id, worker.instance_id, worker.dns))
+                                        count += 1
+                                        enough = (count == initial)
+                                else:
+                                    break
+                        else:
+                            break
+                LOG.info("Selected %d out of %d worker(s) in the cloud %s" % (count, initial, cloud.name))
+
+                # There might be not enough instances running already
+                if not enough:
+                    difference = initial - count
+                    LOG.info("In addition to selected workers, launching %d worker(s) in the cloud %s" % (difference, cloud.name))
+                    reservation = cloud.boot_image(image_id=group['image_id'], count=difference, type=group['instance_type'])
+                    timestamp = datetime.datetime.now()
+                    for instance in reservation.instances:
+                        worker = Worker(self.config, cloud, reservation, instance, timestamp)
+                        self.list.append(worker)
+                        LOG.info(
+                            "Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s, LaunchTime: %s) added to the list"
+                            % (worker.cloud.name, worker.reservation_id, worker.instance_id,
+                            worker.dns, worker.launch_time))
+                        filelog(self.config.node_log, "CREATED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s" %
+                                                      (worker.cloud.name, worker.reservation_id, worker.instance_id, worker.dns))
+                        #count += difference
+                        #enough = (count == initial)
+
+        self.form_cloud_to_lists()
+        #print self.cloud_to_instance_id_list
+        #print self.cloud_to_instance_dns_list
 
         self.sleep_until_all_workers_ready()
         self.contextualize()
 
+    def form_cloud_to_lists(self):
+
+        for cloud in self.clouds.list:
+            self.cloud_to_instance_id_list[cloud.name] = list()
+            self.cloud_to_instance_dns_list[cloud.name] = list()
+        for worker in self.list:
+            # append to the lists
+            (self.cloud_to_instance_id_list[worker.cloud.name]).append("%s" % worker.instance_id)
+            (self.cloud_to_instance_dns_list[worker.cloud.name]).append("%s" % worker.dns)
+
     def sleep_until_all_workers_ready(self, sleep_period_sec=5):
 
         LOG.info('Waiting until all workers are running')
-        while not self.are_all_workers_ready():
-            time.sleep(sleep_period_sec)
+
+        for cloud in self.clouds.list:
+            worker_instances = self.cloud_to_instance_id_list[cloud.name]
+            if worker_instances:    # list is not empty
+                while True:
+
+                    #print worker_instances
+                    all_reservations = cloud.conn.get_all_instances()
+                    for reservation in all_reservations:
+                        for instance in reservation.instances:
+                            #print "Checking instance %s" % (instance.id)
+                            if instance.id in worker_instances:
+                                #print "Instance %s is in the list, state: %s" % (instance.id, instance.state)
+                                if instance.state == "running":
+                                    LOG.info("Worker instance \"%s\" of reservation \"%s\" in cloud \"%s\" is running" %
+                                            (instance.id, reservation.id, cloud.name))
+                                    worker_instances.remove(instance.id)
+                    if not worker_instances:    # list is empty
+                        LOG.info('All workers in cloud %s are running now' % (cloud.name))
+                        break
+                    LOG.info("Workers aren't ready yet. Sleeping")
+                    time.sleep(sleep_period_sec)
+            else: # list is empty
+                LOG.info('No workers in cloud %s to wait for' % (cloud.name))
+
         LOG.info('All workers are running now')
 
-    def are_all_workers_ready(self):
-
-        for wg in self.groups:
-            all_reservations = wg.cloud.conn.get_all_instances()
-            worker_reservation = wg.reservation
-            for reservation in all_reservations:
-                if reservation.id == worker_reservation.id:
-                    for instance in reservation.instances:
-                        if instance.state == "running":
-                            LOG.info("Worker instance \"%s\" of reservation \"%s\" in cloud \"%s\" is running" %
-                                      (instance.id, reservation.id, wg.cloud.name))
-                        else:
-                            return False
-        return True
 
     def contextualize(self):
 
         script_paths = {}
+
         for group in self.config.workers.worker_groups:
             script_paths[group['cloud']] = group['script_path']
 

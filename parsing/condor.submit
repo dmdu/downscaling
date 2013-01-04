@@ -3,5 +3,13 @@ Executable = sleep
 Log = sleep.log
 Output = sleep.out
 Error = sleep.error
-Arguments = 240
+Arguments = 60
+Queue
+Arguments = 60
+Queue
+Arguments = 60
+Queue
+Arguments = 120
+Queue
+Arguments = 120
 Queue
