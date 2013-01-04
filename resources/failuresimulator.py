@@ -1,18 +1,20 @@
 import logging
 import random
 from threading import Thread
+import os
 
 LOG = logging.getLogger(__name__)
 
 class FailureSimulator(Thread):
 
-    def __init__(self, stop_event, config, workers, interval=240):
+    def __init__(self, stop_event, config, workers, interval=40):
 
         Thread.__init__(self)
         self.stop_event = stop_event
         self.config = config
         self.workers = workers
         self.interval = interval
+        random.seed(os.urandom(128))
 
     def run(self):
 

@@ -4,7 +4,7 @@ import os
 from boto.ec2.connection import EC2Connection
 from boto.ec2.regioninfo import RegionInfo
 
-from lib.util import is_yes
+from lib.util import is_yes, printfile
 
 LOG = logging.getLogger(__name__)
 
@@ -103,6 +103,8 @@ class Clouds(object):
 
         terminate = raw_input( "Would you like to terminate running instances now? (Y/N)\n" )
         if is_yes(terminate):
+
+            printfile(self.config.node_log)
 
             for cloud in self.list:
                 cloud.connect()

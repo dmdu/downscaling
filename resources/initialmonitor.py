@@ -54,7 +54,7 @@ class InitialMonitor(Thread):
             items = out.split()
             item_count = len(items)
             # there are normally 8 items per line (i.e. per worker) in the condor_status output
-            print item_count
+            #print item_count
             if item_count%8 != 0:
                 LOG.error("Number of items in the output of condor_status is not a multiple of 8")
             return item_count/8
