@@ -9,12 +9,13 @@ LOG = logging.getLogger(__name__)
 
 class Monitor(Thread):
 
-    def __init__(self, config, master, interval=20):
+    def __init__(self, config, master, workers, interval=20):
 
         Thread.__init__(self)
         self.config = config
         self.master = master
         self.interval = interval
+        self.workers = workers
 
     def run(self):
 
@@ -40,7 +41,10 @@ class Monitor(Thread):
         jobs = Jobs(rcmd.stdout, self.config.workload.user)
         return jobs
 
-    def get_current_workers(self):
+    def query_current_workers(self):
+        """ Connect to master, get list of all workers hostname and return it"""
+
+        workers_dns_list = []
 
         command = "condor_status"
         rcmd = RemoteCommand(
@@ -50,5 +54,75 @@ class Monitor(Thread):
             user = self.config.workload.user,
             command = command)
         rcmd.execute()
-        jobs = Jobs(rcmd.stdout, self.config.workload.user)
-        return jobs
+
+        if rcmd.stdout:
+            # condor status will be lines so split them
+            all_lines = rcmd.stdout.split("\n")
+            for line in all_lines:
+                # line not empty
+                if line.strip():
+                # if its the first line then go to the next one
+                    if line.strip().startswith("Name"):
+                        continue
+                    # if we find a line that starts with total then we are done, break out from the loop
+                    elif line.strip().startswith("Total"):
+                        break
+                    # it must be a line of interest, parse it
+                    else:
+                        # split line by space :
+                        #"vm-148-102.uc.futu LINUX      X86_64 Unclaimed Idle     0.150  2048  0+00:00:04"
+                        line_columns = line.split()
+                        try:
+                            tmp_fqdn = line_columns[0].strip()
+                            workers_dns_list.append(tmp_fqdn)
+                        except Exception as expt:
+                            LOG.info("Error parsing condor status, line says : %s and the expt says : %s" % (line, str(expt)))
+
+        return workers_dns_list
+
+#    def match_workers_to_cloud(self):
+#        """
+#        I found out that hotels hostname always looks like vm-148-103.uc.futuregrid.org and sierra looks like
+#        vm-9.sdsc.futuregrid.org. Also condor status always return at least first and second parts of the hostname,
+#        "vm-148-102.uc.futu" so I used this information to determine which cloud a vm belong to.
+#        """
+#        current_workers = self.query_current_workers()
+#
+#        clouds_dict = {}
+#        for acloud in self.config.clouds.list:
+#            clouds_dict[acloud] = 0
+#
+#        for vms_fqdn in current_workers:
+#            try:
+#                fqdn_parts = vms_fqdn.split(".")
+#                if fqdn_parts[1] == "uc":
+#                    clouds_dict["hotel"] += 1
+#                elif fqdn_parts[1] == "sdsc":
+#                    clouds_dict["sierra"] += 1
+#                else:
+#                    LOG.info("Got strange hostname from condor status, line says : %s" % (vms_fqdn))
+#            except Exception as expt:
+#                LOG.info("Error parsing condor status, line says : %s and the expt says : %s" % (vms_fqdn, str(expt)))
+#
+#        return {time.time():clouds_dict}
+
+
+    def match_workers_to_cloud(self):
+        """
+        This version of the same functions depends on provided workers object and rely on workers.cloud_to_instance_dns_list['hotel']
+        """
+
+        current_workers = self.query_current_workers()
+        current_workers_two_parts = [ ".".join(x.split(".")[:2]) for x in current_workers]
+        clouds_dict = {}
+
+        for acloud in self.config.clouds.list:
+            clouds_dict[acloud] = 0
+            vms_dns = self.workers.cloud_to_instance_dns_list[acloud]
+            vms_dns_two_parts = [ ".".join(x.split(".")[:2]) for x in vms_dns]
+
+            for worker in current_workers_two_parts:
+                if worker in vms_dns_two_parts:
+                    clouds_dict[acloud] += 1
+
+        return {time.time():clouds_dict}
