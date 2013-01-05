@@ -69,6 +69,29 @@ class Cloud(object):
         LOG.info("Attempted to boot instance(s). Result: %s" % (boot_result))
         return boot_result
 
+    def get_instances(self):
+        instances_list = []
+        if self.conn == None:
+            self.connect()
+
+        all_reservations = self.conn.get_all_instances()
+        for reservation in all_reservations:
+            for instance in reservation.instances:
+                instances_list.append(instance)
+        return instances_list
+
+    def terminate_instance(self, instance_id):
+        if self.conn == None:
+            self.connect()
+
+        all_reservations = self.conn.get_all_instances()
+        for reservation in all_reservations:
+            for instance in reservation.instances:
+                if instance.id == instance_id:
+                    instance.terminate()
+                    return True
+        return False
+
     def is_reservation_ready(self, checked_reservation):
 
         all_reservations = self.conn.get_all_instances()
