@@ -87,3 +87,4 @@ class Config(object):
         self.failuresimulator = FailureSimulatorConfig(options.failuresimulator_file)
         self.remote_log = options.remote_log
         self.node_log = options.node_log
+        self.worker_pool_log = options.worker_pool_log

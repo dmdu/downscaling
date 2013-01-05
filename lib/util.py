@@ -159,6 +159,10 @@ def parse_options():
         help="Location of the file with failure simulator config (default: etc/failuresimulator.conf).")
     parser.set_defaults(failuresimulator_file="etc/failuresimulator.conf")
 
+    parser.add_option("-p", "--worker_pool_log", action="store", dest="worker_pool_log",
+        help="Location of the worker pool log file (default: log/worker_pool.log).")
+    parser.set_defaults(worker_pool_log="log/worker_pool.log")
+
     (options, args) = parser.parse_args()
     return (options, args)
 

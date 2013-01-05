@@ -1,15 +1,17 @@
 import logging
 from threading import Thread
 import time
+import datetime
 
 from lib.util import RemoteCommand
 from resources.jobs import Job, Jobs
+from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 
 class Monitor(Thread):
 
-    def __init__(self, config, master, workers, interval=20):
+    def __init__(self, config, master, workers, interval=10):
 
         Thread.__init__(self)
         self.config = config
@@ -24,6 +26,12 @@ class Monitor(Thread):
             time.sleep(self.interval)
 
             jobs = self.get_running_jobs()
+
+            #workers_dns_list = self.query_current_workers()
+            worker_pool, worker_pool_str = self.match_workers_to_cloud()
+            print worker_pool_str
+            filelog(self.config.worker_pool_log, worker_pool_str)
+
             if len(jobs.list) == 0:
                 LOG.info("No jobs in the queue. Terminating Monitor")
                 break
@@ -125,4 +133,13 @@ class Monitor(Thread):
                 if worker in vms_dns_two_parts:
                     clouds_dict[acloud] += 1
 
-        return {time.time():clouds_dict}
+        timestamp = time.time()
+        result = {timestamp:clouds_dict}
+        str_format = "%s," % (timestamp)
+        for cloud_name, instance_count in clouds_dict.iteritems():
+            str_format += "%s:%s," % (cloud_name,str(instance_count))
+        # remove last char
+        str_format = str_format[:-1]
+        return result, str_format
+
+        #return {time.time():clouds_dict}
