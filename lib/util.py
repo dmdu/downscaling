@@ -230,8 +230,18 @@ def is_yes(input):
 
     return (input == 'Y' or input == 'y' or input == 'Yes' or input == 'yes')
 
-def printfile(file_name):
+def printfile(file_name, header=None, grep_for=None):
 
-    with open(file_name, "r") as file:
-        text = file.read()
-        print text
+    #with open(file_name, "r") as file:
+    #    text = file.read()
+    #    print text
+
+    if header:
+        print header
+    if grep_for:
+        command_str = "cat %s | grep %s" % (file_name, grep_for)
+    else:
+        command_str = "cat %s" % (file_name)
+    cmd = Command(command_str)
+    cmd.execute()
+    print cmd.stdout
