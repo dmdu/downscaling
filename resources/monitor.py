@@ -18,6 +18,7 @@ class Monitor(Thread):
         self.master = master
         self.interval = interval
         self.workers = workers
+        self.worker_pool_state = None
 
     def run(self):
 
@@ -31,6 +32,8 @@ class Monitor(Thread):
             worker_pool, worker_pool_str = self.match_workers_to_cloud()
             print worker_pool_str
             filelog(self.config.worker_pool_log, worker_pool_str)
+
+            failures = self.detect_failures(worker_pool)
 
             if len(jobs.list) == 0:
                 LOG.info("No jobs in the queue. Terminating Monitor")
@@ -134,12 +137,38 @@ class Monitor(Thread):
                     clouds_dict[acloud] += 1
 
         timestamp = time.time()
-        result = {timestamp:clouds_dict}
         str_format = "%s," % (timestamp)
         for cloud_name, instance_count in clouds_dict.iteritems():
             str_format += "%s:%s," % (cloud_name,str(instance_count))
         # remove last char
         str_format = str_format[:-1]
-        return result, str_format
+        return clouds_dict, str_format
 
-        #return {time.time():clouds_dict}
+    def detect_failures(self, worker_pool):
+        """ Return a dict like {'sierra': 0, 'hotel': 2} where values are the numbers of failed workers """
+
+        # self.worker_pool_state is treated as the state of worker pool at the previous moment when the monitor ran
+        if not self.worker_pool_state:
+            self.worker_pool_state = worker_pool
+            return None
+        failures = {}
+        for cloud_name, instance_count in worker_pool.iteritems():
+            if not (cloud_name in self.worker_pool_state):
+                LOG.error("Cloud name mismatch. Cloud %s can't be found in the worker pool state" % (cloud_name))
+            #timestamp = datetime.datetime.now()
+            if instance_count > self.worker_pool_state[cloud_name]:
+                LOG.info("Monitor detected upscaling: %d new worker(s) joined cloud %s"
+                         % (instance_count-self.worker_pool_state[cloud_name], cloud_name))
+            elif instance_count < self.worker_pool_state[cloud_name]:
+                diff = self.worker_pool_state[cloud_name]-instance_count
+                LOG.info("Monitor detected downscaling: %d worker(s) is(are) missing in cloud %s"
+                         % (diff, cloud_name))
+                failures[cloud_name] = diff
+            else:
+                LOG.info("Monitor didn't detect any changes in the worker pool in cloud %s" % (cloud_name))
+        self.worker_pool_state = worker_pool
+        return failures
+
+
+
+

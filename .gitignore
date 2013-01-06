@@ -41,3 +41,6 @@ nosetests.xml
 log/*.log
 
 .DS_Store
+
+#Dmitry's debugging file
+tests/dmdu.py
