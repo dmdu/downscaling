@@ -45,7 +45,6 @@ class Master(object):
 
             LOG.info("One of the existing instances in cloud \"%s\" is going to be reused as a master node"
                      % (self.cloud.name))
-            printfile(self.config.node_log)
             self.cloud.connect()
             master_selected = False
             while master_selected == False:
@@ -56,9 +55,11 @@ class Master(object):
                         LOG.info("Skipping reservation \"%s\" since it has more than one instance" % (reservation.id))
                         continue
                     instance = instances[0]
+                    printfile(self.config.node_log, "Log entries for instance %s:" % instance.id, instance.id)
                     select_instance = raw_input(
                         "Select instance \"%s\" of reservation \"%s\" in cloud \"%s\" as a master node? (Y/N)\n"
                         % (instance.id, reservation.id, self.cloud.name))
+
                     if is_yes(select_instance):
                         LOG.info("Master node has been selected. Instance: %s, Reservation: %s, Cloud: %s"
                                 % (instance.id, reservation.id, self.cloud.name))

@@ -99,7 +99,7 @@ class Workers(object):
             # Reusing existing worker nodes
 
             LOG.info("Worker nodes are going to be reused")
-            printfile(self.config.node_log)
+            #printfile(self.config.node_log)
 
             for group in self.config.workers.worker_groups:
                 cloud = self.clouds.lookup_by_name(group['cloud'])
@@ -112,10 +112,13 @@ class Workers(object):
                 count = 0
                 enough = (count == initial)
                 if not enough:
+                    if cloud.conn == None:
+                        cloud.connect()
                     for reservation in cloud.conn.get_all_instances():
                         if not enough:
                             for instance in reservation.instances:
                                 if not enough:
+                                    printfile(self.config.node_log, "Log entries for instance %s:" % instance.id, instance.id)
                                     select_instance = raw_input(
                                         "Select instance \"%s\" of reservation \"%s\" in cloud \"%s\" as a worker node? (Y/N)\n"
                                         % (instance.id, reservation.id, cloud.name))
