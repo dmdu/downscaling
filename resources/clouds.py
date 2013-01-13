@@ -80,6 +80,18 @@ class Cloud(object):
                 instances_list.append(instance)
         return instances_list
 
+    def get_running_instances(self):
+        instances_list = []
+        if self.conn == None:
+            self.connect()
+
+        all_reservations = self.conn.get_all_instances()
+        for reservation in all_reservations:
+            for instance in reservation.instances:
+                if instance.state == "running":
+                    instances_list.append(instance)
+        return instances_list
+
     def terminate_instance(self, instance_id):
         if self.conn == None:
             self.connect()
@@ -127,23 +139,32 @@ class Clouds(object):
         terminate = raw_input( "Would you like to terminate running instances now? (Y/N)\n" )
         if is_yes(terminate):
 
-            printfile(self.config.node_log)
-
             for cloud in self.list:
                 cloud.connect()
 
-            for cloud in self.list:
-                if cloud.conn != None:
-                    for reservation in cloud.conn.get_all_instances():
-                        for instance in reservation.instances:
-                            terminate_instance = raw_input(
-                                "Terminate instance \"%s\" in reservation \"%s\" in cloud \"%s\"? (Y/N)\n" %
-                                (instance.id, reservation.id, cloud.name))
-                        if is_yes(terminate_instance):
-                            instance.terminate()
-                            LOG.info("Terminated instance: %s" % (instance.id))
-                        else:
-                            LOG.info("Instance \"%s\" is left running" % (instance.id))
+            terminate_all = raw_input( "Terminate all running instances? (Y/N)\n" )
+            if is_yes(terminate_all):
+
+                for cloud in self.list:
+                    if cloud.conn != None:
+                        for reservation in cloud.conn.get_all_instances():
+                            for instance in reservation.instances:
+                                instance.terminate()
+                                LOG.info("Terminated instance: %s" % (instance.id))
+
+            else:
+
+                for cloud in self.list:
+                    if cloud.conn != None:
+                        for reservation in cloud.conn.get_all_instances():
+                            for instance in reservation.instances:
+                                printfile(self.config.node_log, "Log entries for instance %s:" % instance.id, instance.id)
+                                terminate_instance = raw_input("Terminate instance \"%s\"? (Y/N)\n" % (instance.id))
+                                if is_yes(terminate_instance):
+                                    instance.terminate()
+                                    LOG.info("Terminated instance: %s" % (instance.id))
+                                else:
+                                    LOG.info("Instance \"%s\" is left running" % (instance.id))
 
             for cloud in self.list:
                 cloud.conn = None

@@ -177,7 +177,7 @@ class Workers(object):
             (self.cloud_to_instance_id_list[worker.cloud.name]).append("%s" % worker.instance_id)
             (self.cloud_to_instance_dns_list[worker.cloud.name]).append("%s" % worker.dns)
 
-    def sleep_until_all_workers_ready(self, sleep_period_sec=5):
+    def sleep_until_all_workers_ready(self, sleep_period_sec=20):
 
         LOG.info('Waiting until all workers are running')
 

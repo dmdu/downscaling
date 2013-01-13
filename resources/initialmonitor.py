@@ -8,7 +8,7 @@ LOG = logging.getLogger(__name__)
 
 class InitialMonitor(Thread):
 
-    def __init__(self, config, master, expected_worker_count, interval=10):
+    def __init__(self, config, master, expected_worker_count, interval=30):
 
         Thread.__init__(self)
         self.config = config

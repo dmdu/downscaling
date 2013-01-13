@@ -10,7 +10,7 @@ LOG = logging.getLogger(__name__)
 
 class FailureSimulator(Thread):
 
-    def __init__(self, stop_event, config, master, interval=60):
+    def __init__(self, stop_event, config, master, interval=120):
 
         Thread.__init__(self)
         self.stop_event = stop_event
@@ -19,16 +19,102 @@ class FailureSimulator(Thread):
         self.interval = interval
         random.seed(os.urandom(128))
 
-    def get_termination_list(self):
+    def get_termination_list_from_condor(self):
+
+        # Get a list of condor workers from the condor master
+        condor_list = []
+        command = "condor_status"
+        rcmd = RemoteCommand(
+            config = self.config,
+            hostname = self.master.dns,
+            ssh_private_key = self.config.globals.priv_path,
+            user = self.config.workload.user,
+            command = command)
+        rcmd.execute()
+        if rcmd.stdout:
+            # condor status will be lines so split them
+            all_lines = rcmd.stdout.split("\n")
+            for line in all_lines:
+                # line not empty
+                if line.strip():
+                # if its the first line then go to the next one
+                    if line.strip().startswith("Name"):
+                        continue
+                    # if we find a line that starts with total then we are done, break out from the loop
+                    elif line.strip().startswith("Total"):
+                        break
+                    # it must be a line of interest, parse it
+                    else:
+                        # split line by space :
+                        #"vm-148-102.uc.futu LINUX      X86_64 Unclaimed Idle     0.150  2048  0+00:00:04"
+                        line_columns = line.split()
+                        try:
+                            tmp_fqdn = line_columns[0].strip()
+                            condor_list.append(tmp_fqdn)
+                        except Exception as expt:
+                            LOG.info("Error parsing condor status, line says : %s and the expt says : %s" % (line, str(expt)))
+
+        LOG.info("Preparing termination list. Condor worker names: %s" % str(condor_list))
+        # Find matching instances
+
+        # this works when all clouds are working
         list_of_clouds = []
         for acloud in self.config.clouds.list:
             cloud = Cloud(acloud, self.config)
             list_of_clouds.append(cloud)
 
+        # For now (while sierra isn't working)
+        #list_of_clouds = []
+        #cloud = Cloud('hotel', self.config)
+        #list_of_clouds.append(cloud)
+
         # figure out how many vms we have in all our clouds
         list_of_vms = []
         for acloud in list_of_clouds:
-            vms = acloud.get_instances()
+            #vms = acloud.get_instances()
+            # Only return running instances so the simulator doesn't kill additional workers while they are booting
+            vms = acloud.get_running_instances()
+            if vms:
+                list_of_vms.extend(vms)
+
+        # add to the termination list only workers (no master) that have checked in with the master:
+        termination_list = []
+        for instance in list_of_vms:
+
+            # not a master
+            if not instance.public_dns_name == self.master.dns:
+
+                for worker_partial_name in condor_list:
+                    if worker_partial_name in instance.public_dns_name:
+                        termination_list.append(instance)
+                        condor_list.remove(worker_partial_name)
+
+        termination_list_names =[]
+        for instance in termination_list:
+            termination_list_names.append(instance.public_dns_name)
+        LOG.info("Prepared termination list: %s" % str(termination_list_names))
+
+        return termination_list
+
+    def get_termination_list(self):
+
+        # this works when all clouds are working
+        #list_of_clouds = []
+        #for acloud in self.config.clouds.list:
+        #    cloud = Cloud(acloud, self.config)
+        #    list_of_clouds.append(cloud)
+
+        # For now (while sierra isn't working)
+        list_of_clouds = []
+        cloud = Cloud('hotel', self.config)
+        list_of_clouds.append(cloud)
+
+        # figure out how many vms we have in all our clouds
+        list_of_vms = []
+        for acloud in list_of_clouds:
+            #vms = acloud.get_instances()
+            # Only return running instances so the simulator doesn't kill additional workers while they are booting
+            vms = acloud.get_running_instances()
             if vms:
                 list_of_vms.extend(vms)
 
@@ -62,7 +148,9 @@ class FailureSimulator(Thread):
             #time.sleep(self.interval)
             self.stop_event.wait(self.interval)
 
-            list_of_vms = self.get_termination_list()
+            #list_of_vms = self.get_termination_list()
+            list_of_vms = self.get_termination_list_from_condor()
+
             # continue as normal
             count = len(list_of_vms)
             if count > 0:

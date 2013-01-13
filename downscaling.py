@@ -51,7 +51,7 @@ class Downscaling(Thread):
         self.workload.execute()
 
         # Launch monitor and failure simulator
-        self.monitor = Monitor(self.config, self.master, self.workers)
+        self.monitor = Monitor(self.config, self.clouds, self.master, self.workers)
         self.monitor.start()
         self.failuresimulator_stop= Event()
         self.failuresimulator = FailureSimulator(self.failuresimulator_stop, self.config, self.master)
