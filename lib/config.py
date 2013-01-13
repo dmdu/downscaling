@@ -69,8 +69,8 @@ class FailureSimulatorConfig(object):
         self.afile = afile
         self.config = read_config(self.afile)
         default_dict = self.config.defaults()
-        self.failure_rate = int(default_dict['failure_rate'])
-        self.min_interval = int(default_dict['min_interval'])
+        self.failure_rate = float(default_dict['failure_rate'])
+        self.min_interval = float(default_dict['min_interval'])
 
 class Config(object):
     """ Config class retrieves all configuration information """

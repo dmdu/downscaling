@@ -2,22 +2,107 @@ import logging
 from threading import Thread
 import time
 import datetime
+import copy
 
 from lib.util import RemoteCommand
 from resources.jobs import Job, Jobs
 from lib.logger import filelog
+from resources.workerpool import WorkerPool
+from resources.workers import Worker, Workers
 
 LOG = logging.getLogger(__name__)
 
-class Monitor(Thread):
+class AdditionalWorker(Thread):
 
-    def __init__(self, config, master, workers, interval=10):
+    def __init__(self, config, cloud, master_dns, sleep_period_sec=5):
 
         Thread.__init__(self)
         self.config = config
+        self.cloud_name = cloud.name
+        self.cloud = cloud
+        self.master_dns = master_dns
+        self.sleep_period_sec = float(sleep_period_sec)
+        self.new_worker = None
+
+    def run(self):
+
+        LOG.info("Additional Worker thread: adding a worker in: %s" % (self.cloud_name))
+
+        group = None
+        for group in self.config.workers.worker_groups:
+            if group['cloud'] == self.cloud_name:
+                break
+        if not group:
+            LOG.error("Can't find worker group for cloud name: %s" % (self.cloud_name))
+            return
+
+        reservation = self.cloud.boot_image(image_id=group['image_id'], count=1, type=group['instance_type'])
+        timestamp = datetime.datetime.now()
+        instances = reservation.instances
+        instance = instances[0]
+        worker = Worker(self.config, self.cloud, reservation, instance, timestamp)
+        LOG.info(
+            "Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s, LaunchTime: %s) added"
+            % (worker.cloud.name, worker.reservation_id, worker.instance_id, worker.dns, worker.launch_time))
+        filelog(self.config.node_log, "ADDED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s"
+                                      % (worker.cloud.name, worker.reservation_id, worker.instance_id, worker.dns))
+
+        # Sleep until running
+        running = False
+        while not running:
+            all_reservations = self.cloud.conn.get_all_instances()
+            for checked_reservation in all_reservations:
+                if checked_reservation.id == worker.reservation_id and (not running):
+                    for checked_instance in checked_reservation.instances:
+                        if checked_instance.id == worker.instance_id and (not running):
+                            if checked_instance.state == "running":
+                                LOG.info("Additional worker instance \"%s\" of reservation \"%s\" in cloud \"%s\" is running" %
+                                     (checked_instance.id, checked_reservation.id, self.cloud.name))
+                                running = True
+                            else:
+                                time.sleep(self.sleep_period_sec)
+                                LOG.info("Additional worker instance \"%s\" is not running yet" % (checked_instance.id))
+
+        # Contextualize
+        rc = RemoteCommand(
+            config = self.config,
+            hostname = worker.dns,
+            ssh_private_key = self.config.globals.priv_path,
+            user = 'root',
+            command = "%s %s" % (group['script_path'], self.master_dns))
+        code = rc.execute()
+        print rc.stderr
+        print rc.stdout
+        if code == 0:
+            LOG.info("Additional worker node \"%s\" was contextualized successfully. Details are in remote log file"
+                     % (worker.instance_id))
+        else:
+            LOG.error("Error occurred during contextualization of additional worker node \"%s\""
+                      % (worker.instance_id))
+
+        LOG.info("Additional worker instance \"%s\" is ready to be returned and added to the pool" % (worker.instance_id))
+        self.new_worker = worker
+
+class Monitor(Thread):
+
+    def __init__(self, config, clouds, master, workers, interval=10):
+
+        Thread.__init__(self)
+        self.config = config
+        self.clouds = clouds
         self.master = master
         self.interval = interval
         self.workers = workers
+        self.prev_pool = None
+        self.additionalworkers = list()
+        self.cloud_blacklist = list() # cloud is added to this list if there is a thread adding a worker in it
+
+        # Get desired work pool
+        desired_dict = {}
+        for group in self.config.workers.worker_groups:
+            desired_dict[group['cloud']] = int(group['desired'])
+        self.desired_pool = WorkerPool(desired_dict)
+        LOG.info("Monitor obtained desired worker pool info: %s" % (self.desired_pool.get_str()))
 
     def run(self):
 
@@ -27,14 +112,46 @@ class Monitor(Thread):
 
             jobs = self.get_running_jobs()
 
-            #workers_dns_list = self.query_current_workers()
-            worker_pool, worker_pool_str = self.match_workers_to_cloud()
-            print worker_pool_str
-            filelog(self.config.worker_pool_log, worker_pool_str)
+            curr_dict, curr_dict_str = self.match_workers_to_cloud()
+            print curr_dict_str
+            filelog(self.config.worker_pool_log, curr_dict_str)
+            curr_pool = WorkerPool(curr_dict)
 
-            if len(jobs.list) == 0:
-                LOG.info("No jobs in the queue. Terminating Monitor")
-                break
+            failures = curr_pool.detect_changes(self.prev_pool)
+            self.prev_pool = copy.copy(curr_pool)
+
+            print "Failures: %s" % (str(failures))
+
+            self.actuate(curr_pool, failures, jobs)
+
+            # check additional worker threads
+            if self.additionalworkers:
+                LOG.info("Monitor detected %d additional worker thread(s)" % len(self.additionalworkers))
+                for worker_thread in self.additionalworkers:
+                    if not worker_thread.isAlive(): # run has finished
+                        LOG.info("Detected finished tread: %s" % str(worker_thread))
+
+                        #if worker_thread.new_worker:
+
+                        LOG.info("Tread has a new_worker: id: %s, launch_time: %s"
+                                 % (worker_thread.new_worker.instance_id, worker_thread.new_worker.launch_time))
+                        self.workers.list.append(worker_thread.new_worker)
+                        self.workers.form_cloud_to_lists()
+                        self.additionalworkers.remove(worker_thread)
+                        LOG.info("Monitor added worker node %s to the workers list"
+                                 % worker_thread.new_worker.instance_id)
+
+                        # allow to add workers in this cloud from now on again
+                        if worker_thread.new_worker.cloud.name in self.cloud_blacklist:
+                            self.cloud_blacklist.remove(worker_thread.new_worker.cloud.name)
+                            LOG.info("Monitor unblocked cloud %s from launching new workers"
+                                     % (worker_thread.new_worker.cloud.name))
+
+            # Keep the monitor running for now
+
+            #if len(jobs.list) == 0:
+            #    LOG.info("No jobs in the queue. Terminating Monitor")
+            #    break
 
     def get_running_jobs(self):
 
@@ -134,12 +251,45 @@ class Monitor(Thread):
                     clouds_dict[acloud] += 1
 
         timestamp = time.time()
-        result = {timestamp:clouds_dict}
         str_format = "%s," % (timestamp)
         for cloud_name, instance_count in clouds_dict.iteritems():
             str_format += "%s:%s," % (cloud_name,str(instance_count))
         # remove last char
         str_format = str_format[:-1]
-        return result, str_format
+        return clouds_dict, str_format
 
-        #return {time.time():clouds_dict}
+    def actuate(self, curr_pool, failures, jobs):
+
+        LOG.info("Actuate method has been called")
+        if failures:
+
+            # pick the cloud with the maximum number of failures
+            # if there are several candidates, pick any
+            #sorted_failures = list(sorted(failures, key=failures.__getitem__, reverse=True))
+            # there must be at least one failure at this point
+            #failure_cloud = sorted_failures[0]
+            #failure_number = failures[failure_cloud]
+            scores = {}
+            for group in self.config.workers.worker_groups:
+                cloud_name = group['cloud']
+                potential_pool = curr_pool.pool_with_additional_worker(cloud_name)
+                distance = self.desired_pool.ratio_distance(potential_pool)
+                scores[cloud_name] = distance
+            LOG.info("Monitor calculated scores for adding a worker: %s" % str(scores))
+
+            # lowest distance(score) wins
+            ranked_clouds = list(sorted(scores, key=scores.__getitem__, reverse=False))
+            LOG.info("Monitor ranked clouds for adding a worker: %s" % str(ranked_clouds))
+
+            winner_cloud_name = ranked_clouds[0]
+            LOG.info("Monitor determined the winner cloud: %s" % winner_cloud_name)
+            winner_cloud = self.clouds.lookup_by_name(winner_cloud_name)
+
+            if not winner_cloud_name in self.cloud_blacklist:
+                self.cloud_blacklist.append(winner_cloud_name)
+                worker_thread = AdditionalWorker(self.config, winner_cloud, self.master.dns)
+                worker_thread.start()
+                self.additionalworkers.append(worker_thread)
+            else:
+                LOG.info("Monitor ignored detected failure since a worker has been added to the cloud %s already"
+                         % (winner_cloud_name))

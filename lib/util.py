@@ -8,6 +8,7 @@ import time
 from ConfigParser import SafeConfigParser
 from optparse import OptionParser
 from fabric import api as fabric_api
+from fabric import state
 from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
@@ -66,52 +67,55 @@ class RemoteCommand(object):
         filelog(self.remote_log, "Host: %s, User: %s, CMD: %s" %
                                  (self.hostname, self.user, self.command))
 
-        if os.path.isfile(self.ssh_private_key):
-            context = fabric_api.settings(fabric_api.hide('running', 'stdout', 'stderr', 'warnings'),
-                user=self.user,
-                key_filename=[].append(self.ssh_private_key),
-                disable_known_hosts=True,
-                linewise=True,
-                warn_only=True,
-                abort_on_prompts=True,
-                always_use_pty=True,
-                timeout=5,
-                use_ssh_config=True)
+        while self.retry_count <= self.retry_limit:
 
-        else:
-            LOG.error("Path to ssh private key is invalid")
-            return None
+            if os.path.isfile(self.ssh_private_key):
+                context = fabric_api.settings(fabric_api.hide('running', 'stdout', 'stderr', 'warnings'),
+                    user=self.user,
+                    key_filename=[].append(self.ssh_private_key),
+                    disable_known_hosts=True,
+                    linewise=True,
+                    warn_only=True,
+                    abort_on_prompts=True,
+                    always_use_pty=True,
+                    timeout=5,
+                    use_ssh_config=True)
+            else:
+                LOG.error("Path to ssh private key is invalid")
+                return None
+            try:
+                print "my cache state is %s" % (str(state.connections))
+                for host_key in state.connections.keys():
+                    state.connections.pop(host_key)
+            except Exception as ex:
+                print "Exception in dealing with fabric cache %s " % (str(ex))
 
-        if context:
-            with context:
-                fabric_api.env.host_string = self.hostname
-                try:
-                    results = fabric_api.run(self.command)
-                    self.stdout = results.stdout
-                    self.stderr = results.stderr
 
-                    filelog(self.remote_log, "Error: %s" % (self.stderr))
-                    filelog(self.remote_log, "Output: %s" % (self.stdout))
+            if context:
+                with context:
+                    try:
+                        fabric_api.env.host_string = self.hostname
+                        results = fabric_api.run(self.command)
+                        self.stdout = results.stdout
+                        self.stderr = results.stderr
+                        filelog(self.remote_log, "Error: %s" % (self.stderr))
+                        filelog(self.remote_log, "Output: %s" % (self.stdout))
+                        print "return code from command %s is %s" % (self.command, str(results.return_code))
+                        print "stderr : %s" % (self.stderr)
+                        return results.return_code
+                    except Exception as exptErr:
+                        self.retry_count +=1
+                        errmsg = str(exptErr)
+                        LOG.info("Exception in running remote command: %s" % (errmsg))
+                        time.sleep(self.retry_interval)
+                        LOG.info("Trying to execute remote command again. Retry: %d/%d" % (self.retry_count, self.retry_limit))
 
-                    return results.return_code
-                except Exception as expt:
-                    errmsg = str(expt)
-                    LOG.info("Exception in running remote command: %s" % (errmsg))
+            else:
+                LOG.error("Problem occurred while initializing fabric context")
+                return None
 
-                    self.retry_count += 1
-
-                    if self.retry_count >= self.retry_limit:
-                        LOG.error("Could not execute remote command. Number of retries exceeded the limit")
-                        return None
-
-                    time.sleep(self.retry_interval)
-                    LOG.info("Trying to execute remote command again. Retry: %d/%d"
-                        % (self.retry_count, self.retry_limit))
-                    return self.execute()
-
-        else:
-            LOG.error("Problem occurred while initializing fabric context")
-            return None
+        LOG.error("Could not execute remote command. Number of retries exceeded the limit")
+        return None
 
 
 def read_config(file):
