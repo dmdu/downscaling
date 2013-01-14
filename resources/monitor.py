@@ -14,7 +14,7 @@ LOG = logging.getLogger(__name__)
 
 class AdditionalWorker(Thread):
 
-    def __init__(self, config, cloud, master_dns, sleep_period_sec=5):
+    def __init__(self, config, cloud, master_dns, sleep_period_sec=1):
 
         Thread.__init__(self)
         self.config = config
@@ -26,7 +26,7 @@ class AdditionalWorker(Thread):
 
     def run(self):
 
-        LOG.info("Additional Worker thread: adding a worker in: %s" % (self.cloud_name))
+        LOG.info("(START) Additional Worker thread: adding a worker in: %s" % (self.cloud_name))
 
         group = None
         for group in self.config.workers.worker_groups:
@@ -80,7 +80,7 @@ class AdditionalWorker(Thread):
             LOG.error("Error occurred during contextualization of additional worker node \"%s\""
                       % (worker.instance_id))
 
-        LOG.info("Additional worker instance \"%s\" is ready to be returned and added to the pool" % (worker.instance_id))
+        LOG.info("(END) Additional worker instance \"%s\" is ready to be returned and added to the pool" % (worker.instance_id))
         self.new_worker = worker
 
 class Monitor(Thread):
@@ -147,11 +147,9 @@ class Monitor(Thread):
                             LOG.info("Monitor unblocked cloud %s from launching new workers"
                                      % (worker_thread.new_worker.cloud.name))
 
-            # Keep the monitor running for now
-
-            #if len(jobs.list) == 0:
-            #    LOG.info("No jobs in the queue. Terminating Monitor")
-            #    break
+            if len(jobs.list) == 0:
+                LOG.info("No jobs in the queue. Terminating Monitor")
+                break
 
     def get_running_jobs(self):
 
@@ -293,3 +291,56 @@ class Monitor(Thread):
             else:
                 LOG.info("Monitor ignored detected failure since a worker has been added to the cloud %s already"
                          % (winner_cloud_name))
+
+        def actuate_periodic_downscaling(self, curr_pool, failures, jobs):
+
+            LOG.info("Actuate (periodic downscaling) method has been called")
+            scores = {}
+            for group in self.config.workers.worker_groups:
+                cloud_name = group['cloud']
+                potential_pool = curr_pool.pool_without_one_worker(cloud_name)
+                distance = self.desired_pool.ratio_distance(potential_pool)
+                scores[cloud_name] = distance
+            LOG.info("Monitor calculated scores for termination: %s" % str(scores))
+
+            # lowest distance(score) wins
+            ranked_clouds = list(sorted(scores, key=scores.__getitem__, reverse=False))
+            LOG.info("Monitor ranked clouds for termination: %s" % str(ranked_clouds))
+
+            winner_cloud_name = ranked_clouds[0]
+            LOG.info("Monitor determined the winner cloud for termination: %s" % winner_cloud_name)
+            winner_cloud = self.clouds.lookup_by_name(winner_cloud_name)
+
+            vms_for_termination = self.workers.cloud_to_instance_dns_list['winner_cloud_name']
+
+            if vms_for_termination:
+
+                jlist = jobs.list
+                min_running = jlist[0].running
+                # winner insance is not a real instance object, it is its dns
+                winner_instance = jlist[0].node
+                for job in jlist[1:]:
+                    if job.running < min_running:
+                        min_running = job.running
+                        winner_instance = job.node
+
+                for terminated_worker in self.workers.list:
+                    if terminated_worker.dns == winner_instance:
+                        terminated_worker.terminate()
+                        self.workers.list.remove(terminated_worker)
+                        LOG.info(
+                            "Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s, LaunchTime: %s) terminated"
+                            % (terminated_worker.cloud.name, terminated_worker.reservation_id, terminated_worker.instance_id,
+                               terminated_worker.dns, terminated_worker.launch_time))
+                        filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s" %
+                                                  (terminated_worker.cloud.name, terminated_worker.reservation_id,
+                                                   terminated_worker.instance_id, terminated_worker.dns))
+
+                #for reservation in winner_cloud.conn.get_all_instances():
+                #    for instance in reservation.instances:
+                #        if instance.public_dns_name == winner_instance:
+                #            worker = Worker(self.config, winner_cloud, reservation, instance, None)
+                #            worker.terminate()
+
+            else:
+                LOG.info("Monitor did not find instances to kill in %s" % winner_cloud_name)

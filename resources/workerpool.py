@@ -54,7 +54,7 @@ class WorkerPool(object):
                 LOG.error("Cloud name mismatch. Cloud %s can't be found in the previous worker pool" % (cloud_name))
                 continue
             if instance_count > prev_pool.counts[cloud_name]:
-                LOG.info("Monitor detected upscaling: %d new worker(s) joined cloud %s"
+                LOG.info("(READY) Monitor detected upscaling: %d new worker(s) joined cloud %s"
                          % (instance_count-prev_pool.counts[cloud_name], cloud_name))
             elif instance_count < prev_pool.counts[cloud_name]:
                 print "Curr pool: %s" % str(self.counts)
@@ -72,6 +72,15 @@ class WorkerPool(object):
 
         new_counts = copy.copy(self.counts)
         new_counts[cloud] += 1
+        return WorkerPool(new_counts)
+
+    def pool_without_one_worker(self, cloud):
+        """ Returns a pool without one worker in the specified cloud """
+
+        new_counts = copy.copy(self.counts)
+        new_counts[cloud] -= 1
+        if new_counts[cloud] < 0:
+            new_counts[cloud] = 0
         return WorkerPool(new_counts)
 
     def ratio_distance(self, another_pool):

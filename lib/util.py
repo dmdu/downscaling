@@ -84,7 +84,7 @@ class RemoteCommand(object):
                 LOG.error("Path to ssh private key is invalid")
                 return None
             try:
-                print "my cache state is %s" % (str(state.connections))
+                #print "my cache state is %s" % (str(state.connections))
                 for host_key in state.connections.keys():
                     state.connections.pop(host_key)
             except Exception as ex:
@@ -100,8 +100,8 @@ class RemoteCommand(object):
                         self.stderr = results.stderr
                         filelog(self.remote_log, "Error: %s" % (self.stderr))
                         filelog(self.remote_log, "Output: %s" % (self.stdout))
-                        print "return code from command %s is %s" % (self.command, str(results.return_code))
-                        print "stderr : %s" % (self.stderr)
+                        #print "return code from command %s is %s" % (self.command, str(results.return_code))
+                        #print "stderr : %s" % (self.stderr)
                         return results.return_code
                     except Exception as exptErr:
                         self.retry_count +=1

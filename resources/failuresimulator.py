@@ -10,7 +10,7 @@ LOG = logging.getLogger(__name__)
 
 class FailureSimulator(Thread):
 
-    def __init__(self, stop_event, config, master, interval=120):
+    def __init__(self, stop_event, config, master, interval=180):
 
         Thread.__init__(self)
         self.stop_event = stop_event
@@ -99,15 +99,15 @@ class FailureSimulator(Thread):
     def get_termination_list(self):
 
         # this works when all clouds are working
-        #list_of_clouds = []
-        #for acloud in self.config.clouds.list:
-        #    cloud = Cloud(acloud, self.config)
-        #    list_of_clouds.append(cloud)
+        list_of_clouds = []
+        for acloud in self.config.clouds.list:
+            cloud = Cloud(acloud, self.config)
+            list_of_clouds.append(cloud)
 
         # For now (while sierra isn't working)
-        list_of_clouds = []
-        cloud = Cloud('hotel', self.config)
-        list_of_clouds.append(cloud)
+        #list_of_clouds = []
+        #cloud = Cloud('hotel', self.config)
+        #list_of_clouds.append(cloud)
 
         # figure out how many vms we have in all our clouds
         list_of_vms = []
@@ -170,16 +170,18 @@ class ExpFailureSimulator(FailureSimulator):
     terminate one VM at a time using exponential failure distribution.
     """
 
-    def __init__(self, stop_event, config, master, interval=240):
-        FailureSimulator.__init__(stop_event, config, master, interval)
+    def __init__(self, stop_event, config, master):
+        FailureSimulator.__init__(stop_event, config, master, interval=180)
 
     def run(self):
 
-        LOG.info("Activating Failure Simulator. Sleep period: %d sec" % (self.interval))
+        LOG.info("Activating Exponential Failure Simulator")
         while(not self.stop_event.is_set()):
+            LOG.info("Failure Simulator: sleeping for: %d sec" % (self.interval))
             self.stop_event.wait(self.interval)
 
-            list_of_vms = self.get_termination_list()
+            #list_of_vms = self.get_termination_list()
+            list_of_vms = self.get_termination_list_from_condor()
 
             # continue as normal
             count = len(list_of_vms)
@@ -190,7 +192,7 @@ class ExpFailureSimulator(FailureSimulator):
                 self.stop_condor(instance.public_dns_name)
                 instance.terminate()
                 LOG.info("Failure Simulator terminated an instance %s" % (instance.id))
-                self.interval = random.expovariate(self.config.failuresimulator.failure_rate) + int(self.config.failuresimulator.min_interval)
+                self.interval = random.expovariate(self.config.failuresimulator.failure_rate) + self.config.failuresimulator.min_interval
             else:
                 LOG.info("No instances to kill. Terminating Failure Simulator")
                 self.stop_event.set()
