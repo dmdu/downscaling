@@ -1,4 +1,6 @@
 import logging
+import datetime
+import os
 
 from lib.util import read_config
 from lib.logger import configure_logging
@@ -85,6 +87,14 @@ class Config(object):
         self.workers = WorkersConfig(options.workers_file)
         self.workload = WorkloadConfig(options.workload_file)
         self.failuresimulator = FailureSimulatorConfig(options.failuresimulator_file)
-        self.remote_log = options.remote_log
-        self.node_log = options.node_log
-        self.worker_pool_log = options.worker_pool_log
+
+        __timestamp = datetime.datetime.now()
+        timestamp = __timestamp.strftime("%Y%m%d_%H%M%S")
+        self.experiment_id = timestamp
+        # Create directory for all the logs
+        self.log_dir = "log/%s" % (self.experiment_id)
+        os.mkdir(self.log_dir)
+
+        self.remote_log = "%s/%s" % (self.log_dir, options.remote_log)
+        self.node_log = "%s/%s" % (self.log_dir, options.node_log)
+        self.worker_pool_log = "%s/%s" % (self.log_dir, options.worker_pool_log)

@@ -38,7 +38,7 @@ nosetests.xml
 .idea/*
 
 #Logs
-log/*.log
+log/*
 
 .DS_Store
 

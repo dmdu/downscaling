@@ -100,8 +100,8 @@ class RemoteCommand(object):
                         self.stderr = results.stderr
                         filelog(self.remote_log, "Error: %s" % (self.stderr))
                         filelog(self.remote_log, "Output: %s" % (self.stdout))
-                        print "return code from command %s is %s" % (self.command, str(results.return_code))
-                        print "stderr : %s" % (self.stderr)
+                        #print "return code from command %s is %s" % (self.command, str(results.return_code))
+                        #print "stderr : %s" % (self.stderr)
                         return results.return_code
                     except Exception as exptErr:
                         self.retry_count +=1
@@ -152,20 +152,20 @@ def parse_options():
     parser.set_defaults(workload_file="etc/workload.conf")
 
     parser.add_option("-r", "--remote_log", action="store", dest="remote_log",
-        help="Location of the log file for remote command execution (default: log/remote.log).")
-    parser.set_defaults(remote_log="log/remote.log")
+        help="Location of the log file for remote command execution (default: remote.log).")
+    parser.set_defaults(remote_log="remote.log")
 
     parser.add_option("-n", "--node_log", action="store", dest="node_log",
-        help="Location of the node log file (default: log/node.log).")
-    parser.set_defaults(node_log="log/node.log")
+        help="Location of the node log file (default: node.log).")
+    parser.set_defaults(node_log="node.log")
 
     parser.add_option("-f", "--failuresimulator_file", action="store", dest="failuresimulator_file",
         help="Location of the file with failure simulator config (default: etc/failuresimulator.conf).")
     parser.set_defaults(failuresimulator_file="etc/failuresimulator.conf")
 
     parser.add_option("-p", "--worker_pool_log", action="store", dest="worker_pool_log",
-        help="Location of the worker pool log file (default: log/worker_pool.log).")
-    parser.set_defaults(worker_pool_log="log/worker_pool.log")
+        help="Location of the worker pool log file (default: worker_pool.log).")
+    parser.set_defaults(worker_pool_log="worker_pool.log")
 
     (options, args) = parser.parse_args()
     return (options, args)

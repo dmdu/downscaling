@@ -9,6 +9,7 @@ class Workload(object):
 
     def __init__(self, config, master):
 
+        self.config = config
         command = "scp %s %s@%s:~/%s" % (
             config.workload.submit_local, config.workload.user,
             master.dns, config.workload.submit_remote)
@@ -40,9 +41,10 @@ class Workload(object):
 
     def get_log(self):
 
-        __timestamp = datetime.datetime.now()
-        timestamp = __timestamp.strftime("%Y%m%d_%H%M%S")
-        self.get_log_command = "%s log/%s.log" % (self.__get_log_command, timestamp)
+        #__timestamp = datetime.datetime.now()
+        #timestamp = __timestamp.strftime("%Y%m%d_%H%M%S")
+        #self.get_log_command = "%s log/%s.log" % (self.__get_log_command, timestamp)
+        self.get_log_command = "%s %s/sleep.log" % (self.__get_log_command, self.config.log_dir)
         self.get_log_cmd = Command(self.get_log_command)
 
         code = self.get_log_cmd.execute()

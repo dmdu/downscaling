@@ -4,6 +4,7 @@ import logging
 import signal
 import time
 from threading import Thread, Event
+import os
 
 from lib.logger import configure_logging
 from lib.util import parse_options
@@ -16,6 +17,7 @@ from resources.workload import Workload
 from resources.monitor import Monitor
 from resources.failuresimulator import FailureSimulator
 from resources.initialmonitor import InitialMonitor
+from resources.replacer import Replacer
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
@@ -50,16 +52,18 @@ class Downscaling(Thread):
         self.workload = Workload(self.config, self.master)
         self.workload.execute()
 
-        # Launch monitor and failure simulator
-        self.monitor = Monitor(self.config, self.clouds, self.master, self.workers)
-        self.monitor.start()
+        # Launch replacer and failure simulator
+        self.replacer_stop= Event()
+        self.replacer = Replacer(self.replacer_stop, self.config, self.master, interval=15)
+        self.replacer.start()
+
         self.failuresimulator_stop= Event()
         self.failuresimulator = FailureSimulator(self.failuresimulator_stop, self.config, self.master)
         self.failuresimulator.start()
 
-        # Sleep while the monitor is running (while there are jobs in the queue)
+        # Sleep while the replacer is running (while there are jobs in the queue)
         # Terminate failure simulator then
-        while self.monitor.isAlive():
+        while self.replacer.isAlive():
             time.sleep(5)
         if self.failuresimulator.isAlive():
             self.failuresimulator_stop.set()
