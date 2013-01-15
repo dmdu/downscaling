@@ -84,7 +84,7 @@ class RemoteCommand(object):
                 LOG.error("Path to ssh private key is invalid")
                 return None
             try:
-                print "my cache state is %s" % (str(state.connections))
+                #print "my cache state is %s" % (str(state.connections))
                 for host_key in state.connections.keys():
                     state.connections.pop(host_key)
             except Exception as ex:

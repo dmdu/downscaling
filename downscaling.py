@@ -15,7 +15,7 @@ from resources.master import Master
 from resources.workers import Workers
 from resources.workload import Workload
 from resources.monitor import Monitor
-from resources.failuresimulator import FailureSimulator
+from resources.failuresimulator import FailureSimulator, ExpFailureSimulator, ExpFailureSimulatorInOneCloud
 from resources.initialmonitor import InitialMonitor
 from resources.replacer import Replacer
 
@@ -57,16 +57,29 @@ class Downscaling(Thread):
         self.replacer = Replacer(self.replacer_stop, self.config, self.master, interval=15)
         self.replacer.start()
 
-        self.failuresimulator_stop= Event()
-        self.failuresimulator = FailureSimulator(self.failuresimulator_stop, self.config, self.master)
-        self.failuresimulator.start()
+        #self.failuresimulator_stop= Event()
+        #self.failuresimulator = FailureSimulator(self.failuresimulator_stop, self.config, self.master)
+        #self.failuresimulator = ExpFailureSimulator(self.failuresimulator_stop, self.config, self.master)
+        #self.failuresimulator.start()
+
+        self.simulators = []
+        self.simulators_stops = []
+        for group in self.config.workers.worker_groups:
+            fs = ExpFailureSimulatorInOneCloud(self.failuresimulator_stop, self.config, self.master, group)
+            self.simulators.append(fs)
+            fs_stop = Event()
+            self.simulators_stops.append(fs_stop)
 
         # Sleep while the replacer is running (while there are jobs in the queue)
-        # Terminate failure simulator then
+        # Terminate failure simulators then
         while self.replacer.isAlive():
             time.sleep(5)
-        if self.failuresimulator.isAlive():
-            self.failuresimulator_stop.set()
+
+        for ind in range(len(self.simulators)):
+            fs = self.simulators[ind]
+            if fs.isAlive():
+                fs_stop = self.simulators[ind]
+                fs_stop.set()
 
         # Copy the master log back
         self.workload.get_log()
