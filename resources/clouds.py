@@ -46,7 +46,7 @@ class Cloud(object):
         LOG.info("Registered key \"%s\"" % (self.config.globals.key_name))
         return import_result
 
-    def boot_image(self, image_id, count=1, type='m1.small'):
+    def boot_image(self, image_id, count=1, type='m1.small', user_data=None):
         """ Registers the public key and launches count instances of specified image  """
 
         if self.conn == None:
@@ -64,7 +64,7 @@ class Cloud(object):
             LOG.info("Key \"%s\" is already registered" % (self.config.globals.key_name))
 
         image_object = self.conn.get_image(image_id)
-        boot_result = image_object.run(key_name=self.config.globals.key_name,
+        boot_result = image_object.run(user_data=user_data, key_name=self.config.globals.key_name,
             min_count=count, max_count=count, instance_type=type)
         LOG.info("Attempted to boot instance(s). Result: %s" % (boot_result))
         return boot_result
@@ -91,6 +91,20 @@ class Cloud(object):
                 if instance.state == "running":
                     instances_list.append(instance)
         return instances_list
+
+    def get_pending_instances(self):
+        instances_list = []
+        if self.conn == None:
+            self.connect()
+
+        all_reservations = self.conn.get_all_instances()
+        for reservation in all_reservations:
+            for instance in reservation.instances:
+                if instance.state == "pending":
+                    instances_list.append(instance)
+        return instances_list
+
+
 
     def terminate_instance(self, instance_id):
         if self.conn == None:
