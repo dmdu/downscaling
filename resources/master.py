@@ -1,9 +1,7 @@
 import logging
 import sys
 import time
-import datetime
 
-from lib.util import RemoteCommand
 from lib.util import is_yes, printfile
 from lib.logger import filelog
 
@@ -39,7 +37,6 @@ class Master(object):
             self.determine_dns()
             filelog(self.config.node_log, "CREATED MASTER cloud: %s, reservation: %s, instance: %s, dns: %s" %
                                           (self.cloud.name, self.reservation.id, self.instance_id, self.dns))
-            self.contextualize()
         else:
             # Reusing existing master node
 
@@ -70,8 +67,6 @@ class Master(object):
                         filelog(self.config.node_log, "REUSED MASTER cloud: %s, reservation: %s, instance: %s, dns: %s" %
                                                       (self.cloud.name, self.reservation.id, self.instance_id, self.dns))
 
-                        # Decided not to recontextualize master nodes (assume they have been contextualized previously)
-                        #self.contextualize()
                         break
                 if master_selected == False:
                     print("Master node has not been selected. Looping through the list of existing reservations again.")
@@ -99,18 +94,3 @@ class Master(object):
         for instance in self.reservation.instances:
             instance.terminate()
             LOG.info("Terminated instance: " + instance.id)
-
-    def contextualize(self):
-
-        rc = RemoteCommand(
-            config = self.config,
-            hostname = self.dns,
-            ssh_private_key = self.config.globals.priv_path,
-            user = 'root',
-            command = self.config.master.script_path)
-
-        code = rc.execute()
-        if code == 0:
-            LOG.info("Master node was contextualized successfully. Details are in remote log file")
-        else:
-            LOG.error("Error occurred during master node's contextualization")
