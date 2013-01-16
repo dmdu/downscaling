@@ -18,7 +18,7 @@ class InitialMonitor(Thread):
 
     def run(self):
 
-        time.sleep(30)
+        time.sleep(120)
         LOG.info("Activating Initial Monitor. Expecting workers: %d, sleep period: %d sec"
                  % (self.expected_worker_count, self.interval))
         while True:

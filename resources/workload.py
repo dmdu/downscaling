@@ -1,5 +1,6 @@
 import logging
 import datetime
+import time
 
 from lib.util import Command, RemoteCommand
 
@@ -27,6 +28,7 @@ class Workload(object):
 
     def execute(self):
 
+        time.sleep(30)
         code = self.cmd.execute()
         if code == 0:
             LOG.info("Submit file has been copied to the master node")

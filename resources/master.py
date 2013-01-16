@@ -20,7 +20,10 @@ class Master(object):
         decision_made = False
         create = True
         while decision_made == False:
-            input = raw_input( "Create a new master node or reuse existing? (C/R)\n" )
+
+            #input = raw_input( "Create a new master node or reuse existing? (C/R)\n" )
+            input = 'Create'
+
             if input == 'C' or input == 'c' or input == 'Create' or input == 'create':
                 create = True
                 decision_made = True

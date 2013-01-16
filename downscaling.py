@@ -68,10 +68,11 @@ class Downscaling(Thread):
         self.workload = Workload(self.config, self.master)
         self.workload.execute()
 
-        cont = raw_input("Would you like to continue (start replacer and failure simulators)? (Y/N)\n")
-        if not is_yes(cont):
-            LOG.info("User decided to stop execution here")
-            return
+        #cont = raw_input("Would you like to continue (start replacer and failure simulators)? (Y/N)\n")
+        #if not is_yes(cont):
+        #    LOG.info("User decided to stop execution here")
+        #    return
+        time.sleep(30)
 
         # Launch replacer and failure simulator
         self.replacer_stop= Event()
