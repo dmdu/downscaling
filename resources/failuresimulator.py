@@ -201,13 +201,22 @@ class ExpFailureSimulatorInOneCloud(FailureSimulator):
     """
 
     def __init__(self, stop_event, config, master, group, interval=240):
-        FailureSimulator.__init__(stop_event, config, master, interval)
+
+        FailureSimulator.__init__(self, stop_event, config, master, interval)
         self.group = group
 
     def run(self):
 
         self.cloud_name = self.group['cloud']
+
+        if self.group['failure_rate'] == "None":
+            # No failures, shut the simulator
+            LOG.info("Failure-Simulator-%s: failure rate is set to None. Terminating simulator" % (self.cloud_name))
+            self.stop_event.set()
+            return
+
         self.failute_rate = float(self.group['failure_rate'])
+
         while(not self.stop_event.is_set()):
             LOG.info("Failure-Simulator-%s: sleeping for %d sec" % (self.cloud_name, self.interval))
             self.stop_event.wait(self.interval)
@@ -226,10 +235,6 @@ class ExpFailureSimulatorInOneCloud(FailureSimulator):
                 LOG.info("Failure-Simulator-%s: terminated an instance %s"
                          % (self.cloud_name, instance.id))
                 self.interval = random.expovariate(self.failute_rate)
-
-            #else:
-            #    LOG.info("No instances to kill. Terminating Failure Simulator")
-            #    self.stop_event.set()
 
     def get_cloud_termination_list(self):
 

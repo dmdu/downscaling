@@ -70,7 +70,7 @@ class Cloud(object):
         LOG.info("Attempted to boot instance(s). Result: %s" % (boot_result))
         return boot_result
 
-    def get_instances(self):
+    def get_instances(self, exclude_dns=None):
         instances_list = []
         if self.conn == None:
             self.connect()
@@ -78,7 +78,8 @@ class Cloud(object):
         all_reservations = self.conn.get_all_instances()
         for reservation in all_reservations:
             for instance in reservation.instances:
-                instances_list.append(instance)
+                if not ((exclude_dns) and (instance.public_dns_name == exclude_dns)):
+                    instances_list.append(instance)
         return instances_list
 
     def get_running_instances(self):
@@ -104,7 +105,6 @@ class Cloud(object):
                 if instance.state == "pending":
                     instances_list.append(instance)
         return instances_list
-
 
 
     def terminate_instance(self, instance_id):

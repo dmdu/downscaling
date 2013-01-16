@@ -18,6 +18,8 @@ from resources.monitor import Monitor
 from resources.failuresimulator import FailureSimulator, ExpFailureSimulator, ExpFailureSimulatorInOneCloud
 from resources.initialmonitor import InitialMonitor
 from resources.replacer import Replacer
+from lib.util import is_yes
+from lib.util import Command
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
@@ -46,11 +48,30 @@ class Downscaling(Thread):
         # Wait until all workers register with master (as Idle resources)
         self.initialmonitor = InitialMonitor(self.config, self.master, len(self.workers.list))
         self.initialmonitor.start()
+
+        # While waiting for initial monitor, copy config files to the log directory for current experiment
+        command = "cp conf/* %s/" % (self.config.log_dir)
+        cmd = Command(command)
+        code = cmd.execute()
+        if code == 0:
+            LOG.info("Config files have been copied successfully to the log directory")
+        # Copy workload (def: parsing/condor.submit) file to the log directory
+        command = "cp %s %s/" % (self.config.workload.submit_local, self.config.log_dir)
+        cmd = Command(command)
+        code = cmd.execute()
+        if code == 0:
+            LOG.info("Workload file has been copied successfully to the log directory")
+
         self.initialmonitor.join()
 
         # Submit and execute workload
         self.workload = Workload(self.config, self.master)
         self.workload.execute()
+
+        cont = raw_input("Would you like to continue (start replacer and failure simulators)? (Y/N)\n")
+        if not is_yes(cont):
+            LOG.info("User decided to stop execution here")
+            return
 
         # Launch replacer and failure simulator
         self.replacer_stop= Event()
@@ -65,9 +86,10 @@ class Downscaling(Thread):
         self.simulators = []
         self.simulators_stops = []
         for group in self.config.workers.worker_groups:
-            fs = ExpFailureSimulatorInOneCloud(self.failuresimulator_stop, self.config, self.master, group)
-            self.simulators.append(fs)
             fs_stop = Event()
+            fs = ExpFailureSimulatorInOneCloud(fs_stop, self.config, self.master, group)
+            fs.start()
+            self.simulators.append(fs)
             self.simulators_stops.append(fs_stop)
 
         # Sleep while the replacer is running (while there are jobs in the queue)
@@ -78,7 +100,7 @@ class Downscaling(Thread):
         for ind in range(len(self.simulators)):
             fs = self.simulators[ind]
             if fs.isAlive():
-                fs_stop = self.simulators[ind]
+                fs_stop = self.simulators_stops[ind]
                 fs_stop.set()
 
         # Copy the master log back
