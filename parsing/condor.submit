@@ -4,7 +4,7 @@ Log = sleep.log
 Output = sleep.out
 Error = sleep.error
 Arguments = 60
-Queue 500
+Queue 100
 Arguments = 120
-Queue 150
+Queue 200
 

@@ -98,3 +98,10 @@ class Config(object):
         self.remote_log = "%s/%s" % (self.log_dir, options.remote_log)
         self.node_log = "%s/%s" % (self.log_dir, options.node_log)
         self.worker_pool_log = "%s/%s" % (self.log_dir, options.worker_pool_log)
+
+
+        # This is dirty but will work for now
+        # Aggressive policy params
+        self.threshold = "0+00:00:30"
+        self.discarded_work_log = "%s/%s" % (self.log_dir, "discarded_work.log")
+        self.downscaler_interval = 120
