@@ -20,6 +20,7 @@ from resources.initialmonitor import InitialMonitor
 from resources.replacer import Replacer
 from lib.util import is_yes
 from lib.util import Command
+from resources.aggressive import AggressiveDownscaler
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class Downscaling(Thread):
         # Get information about available clouds
         self.clouds = Clouds(self.config)
 
-        # Potentially terminate some instances from the previous experiment
+        # Potentially terminate some/all instances from the previous experiment
         self.clouds.selected_terminate()
 
         # Launch master and worker nodes
@@ -50,7 +51,7 @@ class Downscaling(Thread):
         self.initialmonitor.start()
 
         # While waiting for initial monitor, copy config files to the log directory for current experiment
-        command = "cp conf/* %s/" % (self.config.log_dir)
+        command = "cp etc/* %s/" % (self.config.log_dir)
         cmd = Command(command)
         code = cmd.execute()
         if code == 0:
@@ -76,38 +77,40 @@ class Downscaling(Thread):
 
         # Launch replacer and failure simulator
         self.replacer_stop= Event()
-        self.replacer = Replacer(self.replacer_stop, self.config, self.master, interval=15)
+        self.replacer = Replacer(self.replacer_stop, self.config, self.master, interval=120)
         self.replacer.start()
 
-        #self.failuresimulator_stop= Event()
-        #self.failuresimulator = FailureSimulator(self.failuresimulator_stop, self.config, self.master)
-        #self.failuresimulator = ExpFailureSimulator(self.failuresimulator_stop, self.config, self.master)
-        #self.failuresimulator.start()
-
-        self.simulators = []
-        self.simulators_stops = []
-        for group in self.config.workers.worker_groups:
-            fs_stop = Event()
-            fs = ExpFailureSimulatorInOneCloud(fs_stop, self.config, self.master, group)
-            fs.start()
-            self.simulators.append(fs)
-            self.simulators_stops.append(fs_stop)
+        if self.config.policy.policy_in_place == "FAILURE":
+            self.simulators = []
+            self.simulators_stops = []
+            for group in self.config.workers.worker_groups:
+                fs_stop = Event()
+                fs = ExpFailureSimulatorInOneCloud(fs_stop, self.config, self.master, group)
+                fs.start()
+                self.simulators.append(fs)
+                self.simulators_stops.append(fs_stop)
+        elif self.config.policy.policy_in_place == "AGGRESSIVE":
+            self.downscaler_stop = Event()
+            self.downscaler = AggressiveDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler.start()
 
         # Sleep while the replacer is running (while there are jobs in the queue)
-        # Terminate failure simulators then
         while self.replacer.isAlive():
             time.sleep(5)
 
-        for ind in range(len(self.simulators)):
-            fs = self.simulators[ind]
-            if fs.isAlive():
-                fs_stop = self.simulators_stops[ind]
-                fs_stop.set()
+        if self.config.policy.policy_in_place == "FAILURE":
+            for ind in range(len(self.simulators)):
+                fs = self.simulators[ind]
+                if fs.isAlive():
+                    fs_stop = self.simulators_stops[ind]
+                    fs_stop.set()
+        elif self.config.policy.policy_in_place == "AGGRESSIVE":
+            if self.downscaler.isAlive():
+                self.downscaler_stop.set()
 
         # Copy the master log back
         self.workload.get_log()
-
-        # Terminate some instances
+        # Terminate some/all instances
         self.clouds.selected_terminate()
 
 def clean_exit(signum, frame):

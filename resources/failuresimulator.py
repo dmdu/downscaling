@@ -1,10 +1,12 @@
 import logging
 import random
 import os
+import time
 
 from threading import Thread
 from resources.clouds import Cloud
 from lib.util import RemoteCommand
+from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 
@@ -234,6 +236,9 @@ class ExpFailureSimulatorInOneCloud(FailureSimulator):
                 instance.terminate()
                 LOG.info("Failure-Simulator-%s: terminated an instance %s"
                          % (self.cloud_name, instance.id))
+                timestamp = time.time()
+                filelog(self.config.failure_log, "%s,TERMINATED,%s,%s"
+                                                 % (timestamp, self.cloud_name, instance.public_dns_name))
                 self.interval = random.expovariate(self.failute_rate)
 
     def get_cloud_termination_list(self):

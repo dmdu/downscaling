@@ -151,6 +151,15 @@ def parse_options():
         help="Location of the file with workload parameters (default: etc/workload.conf).")
     parser.set_defaults(workload_file="etc/workload.conf")
 
+    parser.add_option("-y", "--policy_file", action="store", dest="policy_file",
+        help="Location of the file with policy parameters (default: etc/policy.conf).")
+    parser.set_defaults(policy_file="etc/policy.conf")
+
+    # failuresimulator_file might be deprecated
+    parser.add_option("-f", "--failuresimulator_file", action="store", dest="failuresimulator_file",
+        help="Location of the file with failure simulator config (default: etc/failuresimulator.conf).")
+    parser.set_defaults(failuresimulator_file="etc/failuresimulator.conf")
+
     parser.add_option("-r", "--remote_log", action="store", dest="remote_log",
         help="Location of the log file for remote command execution (default: remote.log).")
     parser.set_defaults(remote_log="remote.log")
@@ -159,13 +168,17 @@ def parse_options():
         help="Location of the node log file (default: node.log).")
     parser.set_defaults(node_log="node.log")
 
-    parser.add_option("-f", "--failuresimulator_file", action="store", dest="failuresimulator_file",
-        help="Location of the file with failure simulator config (default: etc/failuresimulator.conf).")
-    parser.set_defaults(failuresimulator_file="etc/failuresimulator.conf")
-
     parser.add_option("-p", "--worker_pool_log", action="store", dest="worker_pool_log",
         help="Location of the worker pool log file (default: worker_pool.log).")
     parser.set_defaults(worker_pool_log="worker_pool.log")
+
+    parser.add_option("-i", "--discarded_work_log", action="store", dest="discarded_work_log",
+        help="Location of the discarded work log file (default: discarded_work.log).")
+    parser.set_defaults(discarded_work_log="discarded_work.log")
+
+    parser.add_option("-u", "--failure_log", action="store", dest="failure_log",
+        help="Location of the failure log file (default: failure.log).")
+    parser.set_defaults(failure_log="failure.log")
 
     (options, args) = parser.parse_args()
     return (options, args)

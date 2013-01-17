@@ -28,7 +28,7 @@ class Workload(object):
 
     def execute(self):
 
-        time.sleep(30)
+        time.sleep(90)
         code = self.cmd.execute()
         if code == 0:
             LOG.info("Submit file has been copied to the master node")
