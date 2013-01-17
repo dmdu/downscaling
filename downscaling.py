@@ -51,7 +51,7 @@ class Downscaling(Thread):
         self.initialmonitor.start()
 
         # While waiting for initial monitor, copy config files to the log directory for current experiment
-        command = "cp conf/* %s/" % (self.config.log_dir)
+        command = "cp etc/* %s/" % (self.config.log_dir)
         cmd = Command(command)
         code = cmd.execute()
         if code == 0:
@@ -77,38 +77,36 @@ class Downscaling(Thread):
 
         # Launch replacer and failure simulator
         self.replacer_stop= Event()
-        self.replacer = Replacer(self.replacer_stop, self.config, self.master, interval=15)
+        self.replacer = Replacer(self.replacer_stop, self.config, self.master, interval=120)
         self.replacer.start()
 
-        # IF WE USE FAILURE REPLACEMENT (POLICY #1):
-        #self.simulators = []
-        #self.simulators_stops = []
-        #for group in self.config.workers.worker_groups:
-        #    fs_stop = Event()
-        #    fs = ExpFailureSimulatorInOneCloud(fs_stop, self.config, self.master, group)
-        #    fs.start()
-        #    self.simulators.append(fs)
-        #    self.simulators_stops.append(fs_stop)
-
-        # IF WE USE AGGRESSIVE DOWNSCALING (POLICY #3):
-        self.downscaler_stop = Event()
-        self.downscaler = AggressiveDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
-        self.downscaler.start()
+        if self.config.policy.policy_in_place == "FAILURE":
+            self.simulators = []
+            self.simulators_stops = []
+            for group in self.config.workers.worker_groups:
+                fs_stop = Event()
+                fs = ExpFailureSimulatorInOneCloud(fs_stop, self.config, self.master, group)
+                fs.start()
+                self.simulators.append(fs)
+                self.simulators_stops.append(fs_stop)
+        elif self.config.policy.policy_in_place == "AGGRESSIVE":
+            self.downscaler_stop = Event()
+            self.downscaler = AggressiveDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler.start()
 
         # Sleep while the replacer is running (while there are jobs in the queue)
         while self.replacer.isAlive():
             time.sleep(5)
 
-        # IF WE USE FAILURE REPLACEMENT (POLICY #1):
-        #for ind in range(len(self.simulators)):
-        #    fs = self.simulators[ind]
-        #    if fs.isAlive():
-        #        fs_stop = self.simulators_stops[ind]
-        #        fs_stop.set()
-
-        # IF WE USE AGGRESSIVE DOWNSCALING (POLICY #3):
-        if self.downscaler.isAlive():
-            self.downscaler_stop.set()
+        if self.config.policy.policy_in_place == "FAILURE":
+            for ind in range(len(self.simulators)):
+                fs = self.simulators[ind]
+                if fs.isAlive():
+                    fs_stop = self.simulators_stops[ind]
+                    fs_stop.set()
+        elif self.config.policy.policy_in_place == "AGGRESSIVE":
+            if self.downscaler.isAlive():
+                self.downscaler_stop.set()
 
         # Copy the master log back
         self.workload.get_log()

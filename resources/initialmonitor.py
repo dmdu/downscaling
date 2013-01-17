@@ -8,7 +8,7 @@ LOG = logging.getLogger(__name__)
 
 class InitialMonitor(Thread):
 
-    def __init__(self, config, master, expected_worker_count, interval=30):
+    def __init__(self, config, master, expected_worker_count, interval=120):
 
         Thread.__init__(self)
         self.config = config
@@ -18,7 +18,7 @@ class InitialMonitor(Thread):
 
     def run(self):
 
-        time.sleep(120)
+        time.sleep(240)
         LOG.info("Activating Initial Monitor. Expecting workers: %d, sleep period: %d sec"
                  % (self.expected_worker_count, self.interval))
         while True:

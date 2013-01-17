@@ -8,7 +8,7 @@ from threading import Thread
 from resources.clouds import Cloud
 from lib.util import RemoteCommand
 from resources.jobs import Jobs
-from lib.logger import filelog
+    from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 

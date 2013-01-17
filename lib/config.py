@@ -74,6 +74,16 @@ class FailureSimulatorConfig(object):
         self.failure_rate = float(default_dict['failure_rate'])
         self.min_interval = float(default_dict['min_interval'])
 
+class PolicyConfig(object):
+
+    def __init__(self, afile):
+        self.afile = afile
+        self.config = read_config(self.afile)
+        default_dict = self.config.defaults()
+        self.threshold = default_dict['threshold']
+        self.downscaler_interval = int(default_dict['downscaler_interval'])
+        self.policy_in_place = default_dict['policy_in_place']
+
 class Config(object):
     """ Config class retrieves all configuration information """
 
@@ -86,6 +96,7 @@ class Config(object):
         self.clouds = CloudsConfig(options.clouds_file)
         self.workers = WorkersConfig(options.workers_file)
         self.workload = WorkloadConfig(options.workload_file)
+        self.policy = PolicyConfig(options.policy_file)
         self.failuresimulator = FailureSimulatorConfig(options.failuresimulator_file)
 
         __timestamp = datetime.datetime.now()
@@ -94,14 +105,12 @@ class Config(object):
         # Create directory for all the logs
         self.log_dir = "log/%s" % (self.experiment_id)
         os.mkdir(self.log_dir)
-
         self.remote_log = "%s/%s" % (self.log_dir, options.remote_log)
         self.node_log = "%s/%s" % (self.log_dir, options.node_log)
         self.worker_pool_log = "%s/%s" % (self.log_dir, options.worker_pool_log)
+        self.discarded_work_log = "%s/%s" % (self.log_dir, options.discarded_work_log)
+        self.failure_log = "%s/%s" % (self.log_dir, options.failure_log)
 
-
-        # This is dirty but will work for now
-        # Aggressive policy params
-        self.threshold = "0+00:00:30"
-        self.discarded_work_log = "%s/%s" % (self.log_dir, "discarded_work.log")
-        self.downscaler_interval = 120
+        # to keep current code running for now
+        self.threshold = self.policy.threshold
+        self.downscaler_interval = self.policy.downscaler_interval
