@@ -12,7 +12,7 @@ from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 
-class AggressiveDownscaler(Thread):
+class OpportunisticDownscalerA(Thread):
 
     def __init__(self, stop_event, config, master, interval=120):
 
@@ -25,7 +25,7 @@ class AggressiveDownscaler(Thread):
 
     def run(self):
 
-        LOG.info("Activating AD. Sleep period: %d sec" % (self.interval))
+        LOG.info("Activating ODA. Sleep period: %d sec" % (self.interval))
         while(not self.stop_event.is_set()):
             self.stop_event.wait(self.interval)
 
@@ -34,18 +34,19 @@ class AggressiveDownscaler(Thread):
             for cloud_name in curr_dict:
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
                     diff = curr_dict[cloud_name] - self.desired_dict[cloud_name]
-                    candidates = self.get_cloud_instances_by_runtime(cloud_name, jobs)
-                    termination_list = self.select_from_candidates(cloud_name, candidates, diff)
-                    for atuple in termination_list:
-                        instance = atuple[0]
+                    candidates = self.get_idle_instances(cloud_name, jobs)
+
+                    # Only terminate as many as needed
+                    termination_list = candidates[:diff]
+                    for instance in termination_list:
                         dns = instance.public_dns_name
-                        running = atuple[1]
-                        LOG.info("AD terminated instance %s in %s" % (cloud_name, instance.id))
-                        filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%s" % (cloud_name, dns, running))
+                        LOG.info("ODA terminated instance %s in %s" % (cloud_name, instance.id))
+                        filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%d" % (cloud_name, dns, 0))
                         filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s"
                                                       % (cloud_name, "reservation-TBD", instance.id, dns))
                         self.stop_condor(dns)
                         instance.terminate()
+
 
     def get_desired_dict(self):
         # assigns both the total count and the desired dict (by cloud)
@@ -53,7 +54,7 @@ class AggressiveDownscaler(Thread):
         for group in self.config.workers.worker_groups:
             count = int(group['desired'])
             self.desired_dict[group['cloud']] = count
-        LOG.info("AD determined desired dictionary: %s" % (str(self.desired_dict)))
+        LOG.info("ODA determined desired dictionary: %s" % (str(self.desired_dict)))
         return
 
     def get_current_dict(self):
@@ -64,7 +65,7 @@ class AggressiveDownscaler(Thread):
             # we only care about worker instances here, so don't count the master
             count = len(cloud.get_instances(exclude_dns=self.master.dns))
             pool_dict[acloud] = count
-        LOG.info("AD found current instance dictionary: %s" % (str(pool_dict)))
+        LOG.info("ODA found current instance dictionary: %s" % (str(pool_dict)))
         return pool_dict
 
     def get_running_jobs(self):
@@ -79,6 +80,26 @@ class AggressiveDownscaler(Thread):
         rcmd.execute()
         jobs = Jobs(rcmd.stdout, self.config.workload.user)
         return jobs
+
+    def get_idle_instances(self, cloud_name, jobs):
+
+        cloud = Cloud(cloud_name, self.config)
+        # we only care about worker instances here, so don't include the master
+        instances = cloud.get_instances(exclude_dns=self.master.dns)
+        localjobs = copy.copy(jobs)
+
+        idle_instances = []
+        for instance in instances:
+            job_matching_found = False
+            for job in localjobs.list:
+                if instance.public_dns_name == job.node:
+                    job_matching_found = True
+                    localjobs.list.remove(job)
+                    break
+            if not job_matching_found:
+                idle_instances.append(instance)
+                LOG.info("ODA found an idle instance: %s. Selected it for termination" % (instance.public_dns_name))
+        return idle_instances
 
     def get_cloud_instances_by_runtime(self, cloud_name, jobs):
 
@@ -115,10 +136,10 @@ class AggressiveDownscaler(Thread):
         """
 
         if count_needed <= len(candidates):
-            LOG.info("AD: selecting %d out of %d instances for termination in %s. Enough candidates found"
+            LOG.info("ODA: selecting %d out of %d instances for termination in %s. Enough candidates found"
                      % (count_needed, len(candidates), cloud_name))
         else:
-            LOG.info("AD: selecting %d out of %d instances for termination in %s. Not enough candidates"
+            LOG.info("ODA: selecting %d out of %d instances for termination in %s. Not enough candidates"
                      % (count_needed, len(candidates), cloud_name))
 
         first_stage_candidates = candidates[:count_needed]
