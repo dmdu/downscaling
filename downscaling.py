@@ -21,6 +21,7 @@ from resources.replacer import Replacer
 from lib.util import is_yes
 from lib.util import Command
 from resources.aggressive import AggressiveDownscaler
+from resources.opportunistic_a import OpportunisticDownscalerA
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
@@ -89,6 +90,12 @@ class Downscaling(Thread):
                 fs.start()
                 self.simulators.append(fs)
                 self.simulators_stops.append(fs_stop)
+        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_A":
+            self.downscaler_stop = Event()
+            self.downscaler = OpportunisticDownscalerA(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler.start()
+        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_B":
+            pass
         elif self.config.policy.policy_in_place == "AGGRESSIVE":
             self.downscaler_stop = Event()
             self.downscaler = AggressiveDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
@@ -104,6 +111,11 @@ class Downscaling(Thread):
                 if fs.isAlive():
                     fs_stop = self.simulators_stops[ind]
                     fs_stop.set()
+        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_A":
+            if self.downscaler.isAlive():
+                self.downscaler_stop.set()
+        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_B":
+            pass
         elif self.config.policy.policy_in_place == "AGGRESSIVE":
             if self.downscaler.isAlive():
                 self.downscaler_stop.set()

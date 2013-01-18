@@ -218,6 +218,7 @@ class ExpFailureSimulatorInOneCloud(FailureSimulator):
             return
 
         self.failute_rate = float(self.group['failure_rate'])
+        self.interval = random.expovariate(self.failute_rate)
 
         while(not self.stop_event.is_set()):
             LOG.info("Failure-Simulator-%s: sleeping for %d sec" % (self.cloud_name, self.interval))
