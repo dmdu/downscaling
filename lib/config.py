@@ -97,7 +97,6 @@ class Config(object):
         self.workers = WorkersConfig(options.workers_file)
         self.workload = WorkloadConfig(options.workload_file)
         self.policy = PolicyConfig(options.policy_file)
-        self.failuresimulator = FailureSimulatorConfig(options.failuresimulator_file)
 
         __timestamp = datetime.datetime.now()
         timestamp = __timestamp.strftime("%Y%m%d_%H%M%S")
