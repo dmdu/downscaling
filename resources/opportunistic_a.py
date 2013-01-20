@@ -9,6 +9,7 @@ from resources.clouds import Cloud
 from lib.util import RemoteCommand
 from resources.jobs import Jobs
 from lib.logger import filelog
+from resources.workers import Worker
 
 LOG = logging.getLogger(__name__)
 
@@ -44,8 +45,8 @@ class OpportunisticDownscalerA(Thread):
                         filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%d" % (cloud_name, dns, 0))
                         filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s"
                                                       % (cloud_name, "reservation-TBD", instance.id, dns))
-                        self.stop_condor(dns)
-                        instance.terminate()
+                        worker = Worker(self.config, instance)
+                        worker.terminate() # terminates condor daemon and shuts down instance
 
 
     def get_desired_dict(self):
@@ -151,18 +152,3 @@ class OpportunisticDownscalerA(Thread):
                 second_stage_candidates.append(candidate)
 
         return second_stage_candidates
-
-    def stop_condor(self, dns):
-
-        command = "/etc/init.d/condor stop"
-        rcmd = RemoteCommand(
-            config = self.config,
-            hostname = dns,
-            ssh_private_key = self.config.globals.priv_path,
-            user = 'root',
-            command = command)
-        code = rcmd.execute()
-        if code == 0:
-            LOG.info("Successfully stopped Condor daemon on instance: %s" % (dns))
-        else:
-            LOG.error("Error occurred during Condor daemon termination on instance: %s" % (dns))
