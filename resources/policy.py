@@ -1,17 +1,10 @@
 import logging
-import random
-import os
-import copy
-import operator
 
 from threading import Thread, Event
-from resources.clouds import Cloud
-from lib.util import RemoteCommand
-from resources.jobs import Jobs
-from lib.logger import filelog
 from resources.failuresimulator import FailureSimulator
 from resources.aggressive import AggressiveDownscaler
-from resources.opportunistic_a import OpportunisticDownscalerA
+from resources.opportunistic_idle import OpportunisticIdleDownscaler
+from resources.opportunistic_offline import OpportunisticOfflineDownscaler
 
 LOG = logging.getLogger(__name__)
 
@@ -36,13 +29,15 @@ class Policy(object):
                 self.simulators.append(fs)
                 self.simulators_stops.append(fs_stop)
 
-        elif self.name == "OPPORTUNISTIC_A":
+        elif self.name == "OPPORTUNISTIC_IDLE":
             self.downscaler_stop = Event()
-            self.downscaler = OpportunisticDownscalerA(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler = OpportunisticIdleDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
             self.downscaler.start()
 
-        elif self.name == "OPPORTUNISTIC_B":
-            pass
+        elif self.name == "OPPORTUNISTIC_OFFLINE":
+            self.downscaler_stop = Event()
+            self.downscaler = OpportunisticOfflineDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler.start()
 
         elif self.name == "AGGRESSIVE":
             self.downscaler_stop = Event()
@@ -62,12 +57,13 @@ class Policy(object):
                         fs_stop = self.simulators_stops[ind]
                         fs_stop.set()
 
-            elif self.name == "OPPORTUNISTIC_A":
+            elif self.name == "OPPORTUNISTIC_IDLE":
                 if self.downscaler.isAlive():
                     self.downscaler_stop.set()
 
-            elif self.name == "OPPORTUNISTIC_B":
-                pass
+            elif self.name == "OPPORTUNISTIC_OFFLINE":
+                if self.downscaler.isAlive():
+                    self.downscaler_stop.set()
 
             elif self.name == "AGGRESSIVE":
                 if self.downscaler.isAlive():

@@ -114,8 +114,8 @@ class Replacer(Thread):
                     for instance in boot_result.instances:
                         LOG.info("Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s) added"
                                  % (acloud.name, boot_result.id, instance.id, instance.public_dns_name))
-                        filelog(self.config.node_log, "ADDED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s" %
-                                                  (acloud.name, boot_result.id, instance.id, instance.public_dns_name))
+                        filelog(self.config.node_log, "ADDED WORKER cloud: %s, instance: %s, dns: %s" %
+                                                  (acloud.name, instance.id, instance.public_dns_name))
 
                     if boot_result:
                         LOG.info("Boot results of instances is %s" % (boot_result))

@@ -33,6 +33,25 @@ class Worker(object):
         LOG.info("Terminating instance: %s, %s" % (self.instance.id, self.dns))
         self.instance.terminate()
 
+    def offline(self, master_dns):
+        # Marking node offline actually has to be done from the master side
+
+        if master_dns:
+            command = "condor_off -peaceful %s" % (self.dns)
+            rcmd = RemoteCommand(
+                config = self.config,
+                hostname = master_dns,
+                ssh_private_key = self.config.globals.priv_path,
+                user = 'root',
+                command = command)
+            code = rcmd.execute()
+            if code == 0:
+                LOG.info("Successfully marked instance offline: %s" % (self.instance.id))
+            else:
+                LOG.error("Error occurred during marking instance offline: %s" % (self.instance.id))
+        else:
+            LOG.error("Can't mark instance offline without master's dns")
+
 class Workers(object):
 
     def __init__(self, config, clouds, master):

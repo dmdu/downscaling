@@ -35,7 +35,7 @@ class AggressiveDownscaler(Thread):
             for cloud_name in curr_dict:
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
                     diff = curr_dict[cloud_name] - self.desired_dict[cloud_name]
-                    candidates = self.get_cloud_instances_by_runtime(cloud_name, jobs)
+                    candidates = self.get_cloud_instances_by_runtime_inc(cloud_name, jobs)
                     termination_list = self.select_from_candidates(cloud_name, candidates, diff)
                     for atuple in termination_list:
                         instance = atuple[0]
@@ -43,8 +43,8 @@ class AggressiveDownscaler(Thread):
                         running = atuple[1]
                         LOG.info("AD terminated instance %s in %s" % (cloud_name, instance.id))
                         filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%s" % (cloud_name, dns, running))
-                        filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s"
-                                                      % (cloud_name, "reservation-TBD", instance.id, dns))
+                        filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, instance: %s, dns: %s"
+                                                      % (cloud_name, instance.id, dns))
 
                         worker = Worker(self.config, instance)
                         worker.terminate() # terminates condor daemon and shuts down instance
@@ -82,7 +82,9 @@ class AggressiveDownscaler(Thread):
         jobs = Jobs(rcmd.stdout, self.config.workload.user)
         return jobs
 
-    def get_cloud_instances_by_runtime(self, cloud_name, jobs):
+    def get_cloud_instances_by_runtime_inc(self, cloud_name, jobs):
+        """ Return instances in the cloud sorted by the time they have been running their jobs (increasing order) """
+
 
         cloud = Cloud(cloud_name, self.config)
         # we only care about worker instances here, so don't include the master
@@ -103,7 +105,7 @@ class AggressiveDownscaler(Thread):
         sorted_list_str = ""
         for atuple in sorted_instances_by_runtime:
             sorted_list_str += "%s:%s," % (atuple[0].id, atuple[1])
-        LOG.info("Candidates for termination in %s: %s" % (cloud_name, sorted_list_str))
+        LOG.info("AD found candidates for termination in %s: %s" % (cloud_name, sorted_list_str))
 
         return sorted_instances_by_runtime
 
@@ -123,6 +125,7 @@ class AggressiveDownscaler(Thread):
             LOG.info("AD: selecting %d out of %d instances for termination in %s. Not enough candidates"
                      % (count_needed, len(candidates), cloud_name))
 
+        # Truncate if needed (in cases  when count_needed < len(candidates)
         first_stage_candidates = candidates[:count_needed]
 
         # Select candidates with less than threshold amount of work accomplished
