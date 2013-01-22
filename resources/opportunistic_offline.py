@@ -27,11 +27,12 @@ class OpportunisticOfflineDownscaler(Thread):
     def run(self):
 
         LOG.info("Activating OO. Sleep period: %d sec" % (self.interval))
+        jobs = Jobs(self.config, self.master.dns)
         while(not self.stop_event.is_set()):
             self.stop_event.wait(self.interval)
 
             curr_dict = self.get_current_dict()
-            jobs = self.get_running_jobs()
+            jobs.update_current_list()
             for cloud_name in curr_dict:
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
                     diff = curr_dict[cloud_name] - self.desired_dict[cloud_name]
@@ -73,19 +74,6 @@ class OpportunisticOfflineDownscaler(Thread):
             pool_dict[acloud] = count
         LOG.info("OO found current instance dictionary: %s" % (str(pool_dict)))
         return pool_dict
-
-    def get_running_jobs(self):
-
-        command = "condor_q -run | grep %s" % (self.config.workload.user)
-        rcmd = RemoteCommand(
-            config = self.config,
-            hostname = self.master.dns,
-            ssh_private_key = self.config.globals.priv_path,
-            user = self.config.workload.user,
-            command = command)
-        rcmd.execute()
-        jobs = Jobs(rcmd.stdout, self.config.workload.user)
-        return jobs
 
     def get_candidates(self, cloud_name, jobs, count):
         """ Returns two lists of instances that should be terminated.

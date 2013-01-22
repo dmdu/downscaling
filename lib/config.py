@@ -62,17 +62,9 @@ class WorkloadConfig(object):
         default_dict = self.config.defaults()
         self.user = default_dict['user']
         self.submit_local = default_dict['submit_local']
+        self.directory = default_dict['directory']
         self.submit_remote = default_dict['submit_remote']
         self.log_remote = default_dict['log_remote']
-
-class FailureSimulatorConfig(object):
-
-    def __init__(self, afile):
-        self.afile = afile
-        self.config = read_config(self.afile)
-        default_dict = self.config.defaults()
-        self.failure_rate = float(default_dict['failure_rate'])
-        self.min_interval = float(default_dict['min_interval'])
 
 class PolicyConfig(object):
 

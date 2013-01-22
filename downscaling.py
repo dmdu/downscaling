@@ -51,18 +51,12 @@ class Downscaling(Thread):
         code = cmd.execute()
         if code == 0:
             LOG.info("Config files have been copied successfully to the log directory")
-        # Copy workload (def: parsing/condor.submit) file to the log directory
-        command = "cp %s %s/" % (self.config.workload.submit_local, self.config.log_dir)
-        cmd = Command(command)
-        code = cmd.execute()
-        if code == 0:
-            LOG.info("Workload file has been copied successfully to the log directory")
 
         self.initialmonitor.join()
 
-        # Submit and execute workload
+        # Launch workload submission thread
         self.workload = Workload(self.config, self.master)
-        self.workload.execute()
+        self.workload.start()
 
         time.sleep(30)
 
@@ -75,15 +69,19 @@ class Downscaling(Thread):
         self.policy = Policy(self.config, self.master)
         self.policy.start()
 
-        # Sleep while the replacer is running (while there are jobs in the queue)
-        while self.replacer.isAlive():
-            time.sleep(5)
+        # Sleep while there is work to be done still
+        self.workload.join()
+
+        # Stop replacer
+        if self.replacer.isAlive():
+            self.replacer_stop.set()
 
         # Stop downscaling policy
         self.policy.stop()
 
         # Copy the master log back
         self.workload.get_log()
+
         # Terminate some/all instances
         self.clouds.selected_terminate()
 
