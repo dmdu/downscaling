@@ -17,7 +17,8 @@ class Jobs(object):
 
         self.config = config
         self.master_dns = master_dns
-        self.command = "condor_q -run | grep %s" % (self.config.workload.user)
+        self.command_job_list =  "condor_q -run | grep %s" % (self.config.workload.user)
+        self.command_job_count = "condor_q -run | grep %s | wc -l" % (self.config.workload.user)
         self.list = []
 
     def update_current_list(self):
@@ -27,7 +28,7 @@ class Jobs(object):
             hostname = self.master_dns,
             ssh_private_key = self.config.globals.priv_path,
             user = self.config.workload.user,
-            command = self.command)
+            command = self.command_job_list)
         rcmd.execute()
         queue_state = rcmd.stdout
 
@@ -39,3 +40,16 @@ class Jobs(object):
                 for i in range(start, len(items), 6):
                     print "Job %s running for %s on %s" % (items[i], items[i+4], items[i+5])
                     self.list.append(Job(items[i], items[i+4], items[i+5]))
+
+    def get_current_number(self):
+
+        rcmd = RemoteCommand(
+                config = self.config,
+                hostname = self.master_dns,
+                ssh_private_key = self.config.globals.priv_path,
+                user = self.config.workload.user,
+                command = self.command_job_count)
+        rcmd.execute()
+        curr_number = int(rcmd.stdout)
+        return curr_number
+

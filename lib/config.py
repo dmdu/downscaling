@@ -3,7 +3,7 @@ import datetime
 import os
 
 from lib.util import read_config
-from lib.logger import configure_logging
+from lib.util import Command
 
 LOG = logging.getLogger(__name__)
 
@@ -105,3 +105,10 @@ class Config(object):
         # to keep current code running for now
         self.threshold = self.policy.threshold
         self.downscaler_interval = self.policy.downscaler_interval
+
+        # Copy config files to the log directory for current experiment
+        copy_string = "cp etc/* %s/" % (self.log_dir)
+        copy_cmd = Command(copy_string)
+        code = copy_cmd.execute()
+        if code == 0:
+            LOG.info("Config files have been copied successfully to the log directory")

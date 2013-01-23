@@ -4,26 +4,28 @@ import os
 from threading import Thread
 
 from lib.util import Command, RemoteCommand
+from resources.jobs import Jobs
 
 LOG = logging.getLogger(__name__)
 
 class Workload(Thread):
 
-    def __init__(self, config, master):
+    def __init__(self, config, master, interval=30):
 
         Thread.__init__(self)
         self.config = config
         self.master = master
-        self.batch_files = []
-        self.batch_files = os.listdir(self.config.workload.directory)
+        self.batches = os.listdir(self.config.workload.directory)
+        self.interval = interval
 
-        if not self.batch_files:
+        if not self.batches:
             # Use default workload batch file (def: parsing/condor.submit)
-            self.batch_files = [config.workload.submit_local]
+            self.batches = [config.workload.submit_local]
         else:
-            for batch in self.batch_files:
+            self.batch_files = []
+            for batch in self.batches:
                 # Full path
-                batch = "%/%s" % (self.config.workload.directory, batch)
+                self.batch_files.append("%s/%s" % (self.config.workload.directory, batch))
 
         LOG.info("Workload batches: %s" % str(self.batch_files))
 
@@ -35,7 +37,7 @@ class Workload(Thread):
             # if sleep time is specified
             if ("SLEEP" in last_line) or ("sleep" in last_line):
                 # last item in the line
-                sleep_time = int(last_line.split()[1:])
+                sleep_time = int(last_line.split()[-1:][0])
             else:
                 sleep_time = 0
 
@@ -75,17 +77,18 @@ class Workload(Thread):
             self.batch_files.remove(batch)
 
         # After this for loop, go into monitor mode (run while there are jobs in the queue)
-        # TODO: Finish
+        LOG.info("Workload turns into monitor mode: this thread will stop when there are no more jobs in the queue. Sleep interval: %d" % (self.interval))
+        jobs = Jobs(self.config, self.master.dns)
+        while jobs.get_current_number() > 0:
+            time.sleep(self.interval)
+        LOG.info("Workload completed")
 
+    def scp_log_back(self):
 
-    def get_log(self):
-
-        # TODO: REVISIT
-    #        self.__get_log_command = "scp %s@%s:~/%s" % (
-    #            config.workload.user, master.dns, config.workload.log_remote)
-        self.get_log_command = "%s %s/sleep.log" % (self.__get_log_command, self.config.log_dir)
-        self.get_log_cmd = Command(self.get_log_command)
-        code = self.get_log_cmd.execute()
+        scp_string = "scp %s@%s:~/%s %s/sleep.log" \
+                               % (self.config.workload.user, self.master.dns, self.config.workload.log_remote, self.config.log_dir)
+        scp_cmd = Command(scp_string)
+        code = scp_cmd.execute()
         if code == 0:
             LOG.info("Successfully obtained the log from the master node")
         else:

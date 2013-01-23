@@ -45,13 +45,6 @@ class Downscaling(Thread):
         self.initialmonitor = InitialMonitor(self.config, self.master, self.workers.total_number)
         self.initialmonitor.start()
 
-        # While waiting for initial monitor, copy config files to the log directory for current experiment
-        command = "cp etc/* %s/" % (self.config.log_dir)
-        cmd = Command(command)
-        code = cmd.execute()
-        if code == 0:
-            LOG.info("Config files have been copied successfully to the log directory")
-
         self.initialmonitor.join()
 
         # Launch workload submission thread
@@ -80,7 +73,7 @@ class Downscaling(Thread):
         self.policy.stop()
 
         # Copy the master log back
-        self.workload.get_log()
+        self.workload.scp_log_back()
 
         # Terminate some/all instances
         self.clouds.selected_terminate()

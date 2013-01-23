@@ -145,7 +145,8 @@ class Replacer(Thread):
             self.stop_event.wait(self.interval)
             self.replace_failed_instance()
 
-            jobs = self.get_running_jobs()
-            if not jobs.list:
-                LOG.info("No jobs in the queue. Terminating Replacer")
-                self.stop_event.set()
+            # No need for this: when workload thread stops, this thread will be stopped
+            #jobs = self.get_running_jobs()
+            #if not jobs.list:
+            #    LOG.info("No jobs in the queue. Terminating Replacer")
+            #    self.stop_event.set()
