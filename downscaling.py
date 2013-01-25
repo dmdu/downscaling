@@ -4,28 +4,21 @@ import logging
 import signal
 import time
 from threading import Thread, Event
-import os
 
 from lib.logger import configure_logging
 from lib.util import parse_options
-from lib.util import read_config
 from lib.config import Config
 from resources.clouds import Clouds
 from resources.master import Master
 from resources.workers import Workers
 from resources.workload import Workload
-from resources.monitor import Monitor
-from resources.failuresimulator import FailureSimulator, ExpFailureSimulator, ExpFailureSimulatorInOneCloud
 from resources.initialmonitor import InitialMonitor
 from resources.replacer import Replacer
-from lib.util import is_yes
 from lib.util import Command
-from resources.aggressive import AggressiveDownscaler
-from resources.opportunistic_a import OpportunisticDownscalerA
+from resources.policy import Policy
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
-
 
 class Downscaling(Thread):
     def __init__(self, config):
@@ -46,34 +39,18 @@ class Downscaling(Thread):
         # Launch master and worker nodes
         self.master = Master(self.config, self.clouds)
         self.workers = Workers(self.config, self.clouds, self.master)
+        self.workers.create()
 
         # Wait until all workers register with master (as Idle resources)
-        self.initialmonitor = InitialMonitor(self.config, self.master, len(self.workers.list))
+        self.initialmonitor = InitialMonitor(self.config, self.master, self.workers.total_number)
         self.initialmonitor.start()
-
-        # While waiting for initial monitor, copy config files to the log directory for current experiment
-        command = "cp etc/* %s/" % (self.config.log_dir)
-        cmd = Command(command)
-        code = cmd.execute()
-        if code == 0:
-            LOG.info("Config files have been copied successfully to the log directory")
-        # Copy workload (def: parsing/condor.submit) file to the log directory
-        command = "cp %s %s/" % (self.config.workload.submit_local, self.config.log_dir)
-        cmd = Command(command)
-        code = cmd.execute()
-        if code == 0:
-            LOG.info("Workload file has been copied successfully to the log directory")
 
         self.initialmonitor.join()
 
-        # Submit and execute workload
+        # Launch workload submission thread
         self.workload = Workload(self.config, self.master)
-        self.workload.execute()
+        self.workload.start()
 
-        #cont = raw_input("Would you like to continue (start replacer and failure simulators)? (Y/N)\n")
-        #if not is_yes(cont):
-        #    LOG.info("User decided to stop execution here")
-        #    return
         time.sleep(30)
 
         # Launch replacer and failure simulator
@@ -81,47 +58,23 @@ class Downscaling(Thread):
         self.replacer = Replacer(self.replacer_stop, self.config, self.master, interval=120)
         self.replacer.start()
 
-        if self.config.policy.policy_in_place == "FAILURE":
-            self.simulators = []
-            self.simulators_stops = []
-            for group in self.config.workers.worker_groups:
-                fs_stop = Event()
-                fs = ExpFailureSimulatorInOneCloud(fs_stop, self.config, self.master, group)
-                fs.start()
-                self.simulators.append(fs)
-                self.simulators_stops.append(fs_stop)
-        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_A":
-            self.downscaler_stop = Event()
-            self.downscaler = OpportunisticDownscalerA(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
-            self.downscaler.start()
-        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_B":
-            pass
-        elif self.config.policy.policy_in_place == "AGGRESSIVE":
-            self.downscaler_stop = Event()
-            self.downscaler = AggressiveDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
-            self.downscaler.start()
+        # Start downscaling policy
+        self.policy = Policy(self.config, self.master)
+        self.policy.start()
 
-        # Sleep while the replacer is running (while there are jobs in the queue)
-        while self.replacer.isAlive():
-            time.sleep(5)
+        # Sleep while there is work to be done still
+        self.workload.join()
 
-        if self.config.policy.policy_in_place == "FAILURE":
-            for ind in range(len(self.simulators)):
-                fs = self.simulators[ind]
-                if fs.isAlive():
-                    fs_stop = self.simulators_stops[ind]
-                    fs_stop.set()
-        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_A":
-            if self.downscaler.isAlive():
-                self.downscaler_stop.set()
-        elif self.config.policy.policy_in_place == "OPPORTUNISTIC_B":
-            pass
-        elif self.config.policy.policy_in_place == "AGGRESSIVE":
-            if self.downscaler.isAlive():
-                self.downscaler_stop.set()
+        # Stop replacer
+        if self.replacer.isAlive():
+            self.replacer_stop.set()
+
+        # Stop downscaling policy
+        self.policy.stop()
 
         # Copy the master log back
-        self.workload.get_log()
+        self.workload.scp_log_back()
+
         # Terminate some/all instances
         self.clouds.selected_terminate()
 

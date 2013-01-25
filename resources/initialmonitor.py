@@ -15,16 +15,28 @@ class InitialMonitor(Thread):
         self.master = master
         self.interval = interval
         self.expected_worker_count = expected_worker_count
+        self.limit = int(self.config.globals.initial_monitor_time_limit)
 
     def run(self):
 
         time.sleep(240)
-        LOG.info("Activating Initial Monitor. Expecting workers: %d, sleep period: %d sec"
-                 % (self.expected_worker_count, self.interval))
+        self.start_timestamp = time.time()
+
+        LOG.info("Activating Initial Monitor. Expecting workers: %d, sleep period: %d sec, time limit: %d sec"
+                 % (self.expected_worker_count, self.interval, self.limit))
         while True:
             time.sleep(self.interval)
 
             worker_count = self.idle_workers_count()
+
+            elapsed = time.time() - self.start_timestamp
+            if elapsed > self.limit:
+                LOG.info("%d worker(s) registered and Idle. %d worker(s) expected. Time limit has been exceeded"
+                         % (worker_count, self.expected_worker_count))
+                LOG.info("Terminating Unpropagated and Corrupted instances. Leaving only running instances")
+                self.terminate_all_but_running_instances()
+                break
+
             if worker_count == self.expected_worker_count:
                 LOG.info("%d worker(s) registered with the master and Idle (as expected). Terminating Initial Monitor"
                          % (worker_count))
@@ -36,6 +48,7 @@ class InitialMonitor(Thread):
             else:
                 LOG.info("%d out of %d worker(s) registered and Idle. Sleeping again"
                      % (worker_count, self.expected_worker_count))
+
 
     def idle_workers_count(self):
 
@@ -59,3 +72,11 @@ class InitialMonitor(Thread):
             if item_count%8 != 0:
                 LOG.error("Number of items in the output of condor_status is not a multiple of 8")
             return item_count/8
+
+    def terminate_all_but_running_instances(self):
+
+        for cloud_name in self.config.clouds.list:
+            cloud = Cloud(cloud_name, self.config)
+            cloud.terminate_all_but_running_instances()
+
+        time.sleep(30)

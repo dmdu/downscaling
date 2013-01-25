@@ -3,7 +3,7 @@ import datetime
 import os
 
 from lib.util import read_config
-from lib.logger import configure_logging
+from lib.util import Command
 
 LOG = logging.getLogger(__name__)
 
@@ -17,6 +17,7 @@ class GlobalConfig(object):
         self.key_name = default_dict['key_name']
         self.pub_path = default_dict['pub_path']
         self.priv_path = default_dict['priv_path']
+        self.initial_monitor_time_limit = default_dict['initial_monitor_time_limit']
 
 class MasterConfig(object):
     """
@@ -62,17 +63,9 @@ class WorkloadConfig(object):
         default_dict = self.config.defaults()
         self.user = default_dict['user']
         self.submit_local = default_dict['submit_local']
+        self.directory = default_dict['directory']
         self.submit_remote = default_dict['submit_remote']
         self.log_remote = default_dict['log_remote']
-
-class FailureSimulatorConfig(object):
-
-    def __init__(self, afile):
-        self.afile = afile
-        self.config = read_config(self.afile)
-        default_dict = self.config.defaults()
-        self.failure_rate = float(default_dict['failure_rate'])
-        self.min_interval = float(default_dict['min_interval'])
 
 class PolicyConfig(object):
 
@@ -97,7 +90,6 @@ class Config(object):
         self.workers = WorkersConfig(options.workers_file)
         self.workload = WorkloadConfig(options.workload_file)
         self.policy = PolicyConfig(options.policy_file)
-        self.failuresimulator = FailureSimulatorConfig(options.failuresimulator_file)
 
         __timestamp = datetime.datetime.now()
         timestamp = __timestamp.strftime("%Y%m%d_%H%M%S")
@@ -114,3 +106,10 @@ class Config(object):
         # to keep current code running for now
         self.threshold = self.policy.threshold
         self.downscaler_interval = self.policy.downscaler_interval
+
+        # Copy config files to the log directory for current experiment
+        copy_string = "cp etc/* %s/" % (self.log_dir)
+        copy_cmd = Command(copy_string)
+        code = copy_cmd.execute()
+        if code == 0:
+            LOG.info("Config files have been copied successfully to the log directory")

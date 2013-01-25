@@ -9,6 +9,7 @@ from resources.clouds import Cloud
 from lib.util import RemoteCommand
 from resources.jobs import Jobs
 from lib.logger import filelog
+from resources.workers import Worker
 
 LOG = logging.getLogger(__name__)
 
@@ -26,15 +27,16 @@ class AggressiveDownscaler(Thread):
     def run(self):
 
         LOG.info("Activating AD. Sleep period: %d sec" % (self.interval))
+        jobs = Jobs(self.config, self.master.dns)
         while(not self.stop_event.is_set()):
             self.stop_event.wait(self.interval)
 
             curr_dict = self.get_current_dict()
-            jobs = self.get_running_jobs()
+            jobs.update_current_list()
             for cloud_name in curr_dict:
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
                     diff = curr_dict[cloud_name] - self.desired_dict[cloud_name]
-                    candidates = self.get_cloud_instances_by_runtime(cloud_name, jobs)
+                    candidates = self.get_cloud_instances_by_runtime_inc(cloud_name, jobs)
                     termination_list = self.select_from_candidates(cloud_name, candidates, diff)
                     for atuple in termination_list:
                         instance = atuple[0]
@@ -42,10 +44,11 @@ class AggressiveDownscaler(Thread):
                         running = atuple[1]
                         LOG.info("AD terminated instance %s in %s" % (cloud_name, instance.id))
                         filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%s" % (cloud_name, dns, running))
-                        filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s"
-                                                      % (cloud_name, "reservation-TBD", instance.id, dns))
-                        self.stop_condor(dns)
-                        instance.terminate()
+                        filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, instance: %s, dns: %s"
+                                                      % (cloud_name, instance.id, dns))
+
+                        worker = Worker(self.config, instance)
+                        worker.terminate() # terminates condor daemon and shuts down instance
 
     def get_desired_dict(self):
         # assigns both the total count and the desired dict (by cloud)
@@ -67,20 +70,9 @@ class AggressiveDownscaler(Thread):
         LOG.info("AD found current instance dictionary: %s" % (str(pool_dict)))
         return pool_dict
 
-    def get_running_jobs(self):
+    def get_cloud_instances_by_runtime_inc(self, cloud_name, jobs):
+        """ Return instances in the cloud sorted by the time they have been running their jobs (increasing order) """
 
-        command = "condor_q -run | grep %s" % (self.config.workload.user)
-        rcmd = RemoteCommand(
-            config = self.config,
-            hostname = self.master.dns,
-            ssh_private_key = self.config.globals.priv_path,
-            user = self.config.workload.user,
-            command = command)
-        rcmd.execute()
-        jobs = Jobs(rcmd.stdout, self.config.workload.user)
-        return jobs
-
-    def get_cloud_instances_by_runtime(self, cloud_name, jobs):
 
         cloud = Cloud(cloud_name, self.config)
         # we only care about worker instances here, so don't include the master
@@ -101,7 +93,7 @@ class AggressiveDownscaler(Thread):
         sorted_list_str = ""
         for atuple in sorted_instances_by_runtime:
             sorted_list_str += "%s:%s," % (atuple[0].id, atuple[1])
-        LOG.info("Candidates for termination in %s: %s" % (cloud_name, sorted_list_str))
+        LOG.info("AD found candidates for termination in %s: %s" % (cloud_name, sorted_list_str))
 
         return sorted_instances_by_runtime
 
@@ -121,6 +113,7 @@ class AggressiveDownscaler(Thread):
             LOG.info("AD: selecting %d out of %d instances for termination in %s. Not enough candidates"
                      % (count_needed, len(candidates), cloud_name))
 
+        # Truncate if needed (in cases  when count_needed < len(candidates)
         first_stage_candidates = candidates[:count_needed]
 
         # Select candidates with less than threshold amount of work accomplished
@@ -130,18 +123,3 @@ class AggressiveDownscaler(Thread):
                 second_stage_candidates.append(candidate)
 
         return second_stage_candidates
-
-    def stop_condor(self, dns):
-
-        command = "/etc/init.d/condor stop"
-        rcmd = RemoteCommand(
-            config = self.config,
-            hostname = dns,
-            ssh_private_key = self.config.globals.priv_path,
-            user = 'root',
-            command = command)
-        code = rcmd.execute()
-        if code == 0:
-            LOG.info("Successfully stopped Condor daemon on instance: %s" % (dns))
-        else:
-            LOG.error("Error occurred during Condor daemon termination on instance: %s" % (dns))

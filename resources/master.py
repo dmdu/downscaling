@@ -38,8 +38,8 @@ class Master(object):
             self.reservation = self.cloud.boot_image(config.master.image_id, count=1, type=config.master.instance_type)
             self.sleep_until_master_ready()
             self.determine_dns()
-            filelog(self.config.node_log, "CREATED MASTER cloud: %s, reservation: %s, instance: %s, dns: %s" %
-                                          (self.cloud.name, self.reservation.id, self.instance_id, self.dns))
+            filelog(self.config.node_log, "CREATED MASTER cloud: %s, instance: %s, dns: %s" %
+                                          (self.cloud.name, self.instance_id, self.dns))
         else:
             # Reusing existing master node
 

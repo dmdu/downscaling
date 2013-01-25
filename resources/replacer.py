@@ -114,8 +114,8 @@ class Replacer(Thread):
                     for instance in boot_result.instances:
                         LOG.info("Worker (Cloud: %s, Reservation: %s, Instance: %s, DNS: %s) added"
                                  % (acloud.name, boot_result.id, instance.id, instance.public_dns_name))
-                        filelog(self.config.node_log, "ADDED WORKER cloud: %s, reservation: %s, instance: %s, dns: %s" %
-                                                  (acloud.name, boot_result.id, instance.id, instance.public_dns_name))
+                        filelog(self.config.node_log, "ADDED WORKER cloud: %s, instance: %s, dns: %s" %
+                                                  (acloud.name, instance.id, instance.public_dns_name))
 
                     if boot_result:
                         LOG.info("Boot results of instances is %s" % (boot_result))
@@ -126,18 +126,18 @@ class Replacer(Thread):
             LOG.info("Replacer is not missing any instances. Sleeping")
 
 
-    def get_running_jobs(self):
-
-        command = "condor_q -run | grep %s" % (self.config.workload.user)
-        rcmd = RemoteCommand(
-            config = self.config,
-            hostname = self.master.dns,
-            ssh_private_key = self.config.globals.priv_path,
-            user = self.config.workload.user,
-            command = command)
-        rcmd.execute()
-        jobs = Jobs(rcmd.stdout, self.config.workload.user)
-        return jobs
+#    def get_running_jobs(self):
+#
+#        command = "condor_q -run | grep %s" % (self.config.workload.user)
+#        rcmd = RemoteCommand(
+#            config = self.config,
+#            hostname = self.master.dns,
+#            ssh_private_key = self.config.globals.priv_path,
+#            user = self.config.workload.user,
+#            command = command)
+#        rcmd.execute()
+#        jobs = Jobs(rcmd.stdout, self.config.workload.user)
+#        return jobs
 
 
     def run(self):
@@ -145,7 +145,8 @@ class Replacer(Thread):
             self.stop_event.wait(self.interval)
             self.replace_failed_instance()
 
-            jobs = self.get_running_jobs()
-            if not jobs.list:
-                LOG.info("No jobs in the queue. Terminating Replacer")
-                self.stop_event.set()
+            # No need for this: when workload thread stops, this thread will be stopped
+            #jobs = self.get_running_jobs()
+            #if not jobs.list:
+            #    LOG.info("No jobs in the queue. Terminating Replacer")
+            #    self.stop_event.set()

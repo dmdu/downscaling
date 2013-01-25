@@ -155,11 +155,6 @@ def parse_options():
         help="Location of the file with policy parameters (default: etc/policy.conf).")
     parser.set_defaults(policy_file="etc/policy.conf")
 
-    # failuresimulator_file might be deprecated
-    parser.add_option("-f", "--failuresimulator_file", action="store", dest="failuresimulator_file",
-        help="Location of the file with failure simulator config (default: etc/failuresimulator.conf).")
-    parser.set_defaults(failuresimulator_file="etc/failuresimulator.conf")
-
     parser.add_option("-r", "--remote_log", action="store", dest="remote_log",
         help="Location of the log file for remote command execution (default: remote.log).")
     parser.set_defaults(remote_log="remote.log")
