@@ -17,6 +17,7 @@ class GlobalConfig(object):
         self.key_name = default_dict['key_name']
         self.pub_path = default_dict['pub_path']
         self.priv_path = default_dict['priv_path']
+        self.initial_monitor_time_limit = default_dict['initial_monitor_time_limit']
 
 class MasterConfig(object):
     """

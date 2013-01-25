@@ -74,13 +74,21 @@ class Workload(Thread):
             time.sleep(sleep_time)
 
             # Done with this file
-            self.batch_files.remove(batch)
+            #self.batch_files.remove(batch)
+
+        # To give it enough time so the jobs are scheduled; unless specified otherwise
+        if sleep_time == 0:
+            time.sleep(30)
 
         # After this for loop, go into monitor mode (run while there are jobs in the queue)
         LOG.info("Workload turns into monitor mode: this thread will stop when there are no more jobs in the queue. Sleep interval: %d" % (self.interval))
         jobs = Jobs(self.config, self.master.dns)
-        while jobs.get_current_number() > 0:
+        count = jobs.get_current_number()
+        print "Initial job count: %d" % (count)
+        while  count > 0:
             time.sleep(self.interval)
+            count = jobs.get_current_number()
+            print "Job count: %d" % (count)
         LOG.info("Workload completed")
 
     def scp_log_back(self):

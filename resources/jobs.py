@@ -18,7 +18,8 @@ class Jobs(object):
         self.config = config
         self.master_dns = master_dns
         self.command_job_list =  "condor_q -run | grep %s" % (self.config.workload.user)
-        self.command_job_count = "condor_q -run | grep %s | wc -l" % (self.config.workload.user)
+        # No -run in the next command, all jobs (including the ones that aren't scheduled yet)
+        self.command_job_count = "condor_q | grep %s | wc -l" % (self.config.workload.user)
         self.list = []
 
     def update_current_list(self):

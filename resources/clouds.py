@@ -131,6 +131,19 @@ class Cloud(object):
                         return False
         return True
 
+    def terminate_all_but_running_instances(self):
+
+        if self.conn == None:
+            self.connect()
+
+        all_reservations = self.conn.get_all_instances()
+        for reservation in all_reservations:
+            for instance in reservation.instances:
+                if not (instance.state == "running"):
+                    LOG.info("Instance %s in cloud %d isn't running. Terminating it" % (self.name, instance.id))
+                    instance.terminate()
+
+
 class Clouds(object):
     """ Clusters class represents a collection of clouds specified in the clouds file """
 

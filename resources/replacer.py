@@ -126,18 +126,18 @@ class Replacer(Thread):
             LOG.info("Replacer is not missing any instances. Sleeping")
 
 
-    def get_running_jobs(self):
-
-        command = "condor_q -run | grep %s" % (self.config.workload.user)
-        rcmd = RemoteCommand(
-            config = self.config,
-            hostname = self.master.dns,
-            ssh_private_key = self.config.globals.priv_path,
-            user = self.config.workload.user,
-            command = command)
-        rcmd.execute()
-        jobs = Jobs(rcmd.stdout, self.config.workload.user)
-        return jobs
+#    def get_running_jobs(self):
+#
+#        command = "condor_q -run | grep %s" % (self.config.workload.user)
+#        rcmd = RemoteCommand(
+#            config = self.config,
+#            hostname = self.master.dns,
+#            ssh_private_key = self.config.globals.priv_path,
+#            user = self.config.workload.user,
+#            command = command)
+#        rcmd.execute()
+#        jobs = Jobs(rcmd.stdout, self.config.workload.user)
+#        return jobs
 
 
     def run(self):
