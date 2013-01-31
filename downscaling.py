@@ -10,12 +10,13 @@ from lib.util import parse_options
 from lib.config import Config
 from resources.clouds import Clouds
 from resources.master import Master
-from resources.workers import Workers
+from resources.workers_phantom import Workers
 from resources.workload import Workload
 from resources.initialmonitor import InitialMonitor
 from resources.replacer import Replacer
 from lib.util import Command
 from resources.policy import Policy
+from resources.phantom import PhantomClient
 
 SIGEXIT = False
 LOG = logging.getLogger(__name__)
@@ -37,7 +38,19 @@ class Downscaling(Thread):
         self.clouds.selected_terminate()
 
         # Launch master and worker nodes
-        self.master = Master(self.config, self.clouds)
+        #self.master = Master(self.config, self.clouds)
+
+        # Phantom client
+        self.phantom_client = PhantomClient(self.config)
+        self.phantom_client.connect()
+        #self.phantom_client.delete_all_launch_config()
+        #self.phantom_client.delete_all_domains()
+        #self.phantom_client.create_launch_configs()
+        #self.phantom_client.create_auto_scaling_group()
+        self.phantom_client.print_info()
+
+        return
+
         self.workers = Workers(self.config, self.clouds, self.master)
         self.workers.create()
 

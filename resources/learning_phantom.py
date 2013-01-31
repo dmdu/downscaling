@@ -11,22 +11,21 @@ from boto.ec2.autoscale.group import AutoScalingGroup
 from boto.ec2.connection import EC2Connection
 
 
-SEC_DIR="/Users/ali/Desktop/futuregrid"
-NIMBUS_ACCESS_FILE="%s/.nimbus/querytokens.sh" % (SEC_DIR)
+SEC_DIR="/Users/dmdu/.ssh/id_rsa_futuregrid"
+#NIMBUS_ACCESS_FILE="%s/.nimbus/querytokens.sh" % (SEC_DIR)
 
-
-logging.basicConfig(filename="/Users/ali/tmp/boto.log", level=logging.DEBUG)
+logging.basicConfig(filename="/tmp/boto.log", level=logging.DEBUG)
 
 
 def build_os_env():
     "to put the credentials in the env"
-    with open(NIMBUS_ACCESS_FILE,'r') as nimubs_access_file:
-        for line in nimubs_access_file:
-            if line.strip():
-                line_as_array = line.split()
-                key = line_as_array[1].split("=")[0]
-                value = line_as_array[1].split("=")[1]
-                os.environ[key] = value
+    #with open(NIMBUS_ACCESS_FILE,'r') as nimubs_access_file:
+    #    for line in nimubs_access_file:
+    #        if line.strip():
+    #            line_as_array = line.split()
+    #            key = line_as_array[1].split("=")[0]
+    #            value = line_as_array[1].split("=")[1]
+    #            os.environ[key] = value
 
     os.environ['EC2_ACCESS_KEY'] = os.environ['NIMBUS_IAAS_ACCESS_KEY']
     os.environ['EC2_SECRET_KEY'] = os.environ['NIMBUS_IAAS_SECRET_KEY']
@@ -157,11 +156,11 @@ if __name__ == '__main__':
 
     # build cloud connection to register the key
     cloud_connection = get_cloud_connection('s83r.idp.sdsc.futuregrid.org',8444)
-    register_key(cloud_connection,"downscaling","/Users/ali/.ssh/id_rsa.pub")
+    register_key(cloud_connection,"downscaling","/Users/dmdu/.ssh/id_rsa_futuregrid.pub")
     print get_all_key_info(cloud_connection)
 
     cloud_connection = get_cloud_connection('svc.uc.futuregrid.org',8444)
-    register_key(cloud_connection,"downscaling","/Users/ali/.ssh/id_rsa.pub")
+    register_key(cloud_connection,"downscaling","/Users/dmdu/.ssh/id_rsa_futuregrid.pub")
     print get_all_key_info(cloud_connection)
 
 
@@ -193,10 +192,8 @@ if __name__ == '__main__':
 
     for group in my_connection.get_all_groups():
         print group.instances
-        print dir(group.instances[0])
         print group.launch_config_name
         print group.tags
-
 
     # reset
     #delete_all_launch_config(my_connection)

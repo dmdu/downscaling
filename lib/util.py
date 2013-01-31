@@ -143,6 +143,10 @@ def parse_options():
         help="Location of the file with clouds parameters (default: etc/clouds.conf).")
     parser.set_defaults(clouds_file="etc/clouds.conf")
 
+    parser.add_option("-f", "--phantom_file", action="store", dest="phantom_file",
+        help="Location of the file with phantom parameters (default: etc/phantom.conf).")
+    parser.set_defaults(phantom_file="etc/phantom.conf")
+
     parser.add_option("-w", "--workers_file", action="store", dest="workers_file",
         help="Location of the file with workers parameters (default: etc/workers.conf).")
     parser.set_defaults(workers_file="etc/workers.conf")

@@ -196,3 +196,13 @@ class Clouds(object):
 
             for cloud in self.list:
                 cloud.conn = None
+
+    def log_instance_distribution(self):
+
+        pool_dict = {}
+        running_pool_dict = {}
+        for acloud in self.list:
+            pool_dict[acloud.name] = len(acloud.get_instances())
+            running_pool_dict[acloud.name] = len(acloud.get_running_instances())
+        LOG.info("Instance distribution        : %s" % str(pool_dict))
+        LOG.info("Running instance distribution: %s" % str(running_pool_dict))
