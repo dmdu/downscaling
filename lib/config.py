@@ -114,21 +114,21 @@ class Config(object):
 
         self.experiment_id = timestamp
         # Create directory for all the logs
-        #self.log_dir = "log/%s" % (self.experiment_id)
-        #os.mkdir(self.log_dir)
-        #self.remote_log = "%s/%s" % (self.log_dir, options.remote_log)
-        #self.node_log = "%s/%s" % (self.log_dir, options.node_log)
-        #self.worker_pool_log = "%s/%s" % (self.log_dir, options.worker_pool_log)
-        #self.discarded_work_log = "%s/%s" % (self.log_dir, options.discarded_work_log)
-        #self.failure_log = "%s/%s" % (self.log_dir, options.failure_log)
+        self.log_dir = "log/%s" % (self.experiment_id)
+        os.mkdir(self.log_dir)
+        self.remote_log = "%s/%s" % (self.log_dir, options.remote_log)
+        self.node_log = "%s/%s" % (self.log_dir, options.node_log)
+        self.worker_pool_log = "%s/%s" % (self.log_dir, options.worker_pool_log)
+        self.discarded_work_log = "%s/%s" % (self.log_dir, options.discarded_work_log)
+        self.failure_log = "%s/%s" % (self.log_dir, options.failure_log)
 
         # to keep current code running for now
         self.threshold = self.policy.threshold
         self.downscaler_interval = self.policy.downscaler_interval
 
         # Copy config files to the log directory for current experiment
-        #copy_string = "cp etc/* %s/" % (self.log_dir)
-        #copy_cmd = Command(copy_string)
-        #code = copy_cmd.execute()
-        #if code == 0:
-        #    LOG.info("Config files have been copied successfully to the log directory")
+        copy_string = "cp etc/* %s/" % (self.log_dir)
+        copy_cmd = Command(copy_string)
+        code = copy_cmd.execute()
+        if code == 0:
+            LOG.info("Config files have been copied successfully to the log directory")

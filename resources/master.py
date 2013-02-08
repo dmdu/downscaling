@@ -96,4 +96,4 @@ class Master(object):
 
         for instance in self.reservation.instances:
             instance.terminate()
-            LOG.info("Terminated instance: " + instance.id)
+            LOG.info("Terminated master: " + instance.id)

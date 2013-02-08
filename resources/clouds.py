@@ -82,6 +82,16 @@ class Cloud(object):
                     instances_list.append(instance)
         return instances_list
 
+    def get_instance_by_id(self, instance_id):
+        instances_list = []
+        if self.conn == None:
+            self.connect()
+        all_reservations = self.conn.get_all_instances()
+        for reservation in all_reservations:
+            for instance in reservation.instances:
+                if instance_id == instance.id:
+                    return instance
+
     def get_running_instances(self):
         instances_list = []
         if self.conn == None:
@@ -162,16 +172,23 @@ class Clouds(object):
                 return cloud
         return None
 
+    def get_instance_cloud(self, instance_id):
+        for cloud in self.list:
+            if cloud.get_instance_by_id(instance_id):
+                return cloud
+
     def selected_terminate(self):
 
-        terminate = raw_input( "Would you like to terminate running instances now? (Y/N)\n" )
-        if is_yes(terminate):
+        #terminate = raw_input( "Would you like to terminate running instances now? (Y/N)\n" )
+        terminate = True
+        if terminate:
 
             for cloud in self.list:
                 cloud.connect()
 
-            terminate_all = raw_input( "Terminate all running instances? (Y/N)\n" )
-            if is_yes(terminate_all):
+            #terminate_all = raw_input( "Terminate all running instances? (Y/N)\n" )
+            terminate_all = True
+            if terminate_all:
 
                 for cloud in self.list:
                     if cloud.conn != None:

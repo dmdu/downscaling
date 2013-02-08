@@ -1,6 +1,6 @@
 import logging
 
-from threading import Thread, Event
+from threading import Event
 from resources.failuresimulator import FailureSimulator
 from resources.aggressive import AggressiveDownscaler
 from resources.opportunistic_idle import OpportunisticIdleDownscaler
@@ -10,11 +10,12 @@ LOG = logging.getLogger(__name__)
 
 class Policy(object):
 
-    def __init__(self, config, master):
+    def __init__(self, config, master, phantom_client):
 
         self.config = config
         self.master = master
         self.running = False
+        self.phantom_client = phantom_client
         self.name = self.config.policy.policy_in_place
 
     def start(self):
@@ -31,17 +32,17 @@ class Policy(object):
 
         elif self.name == "OPPORTUNISTIC_IDLE":
             self.downscaler_stop = Event()
-            self.downscaler = OpportunisticIdleDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler = OpportunisticIdleDownscaler(self.downscaler_stop, self.config, self.master, self.phantom_client, self.config.downscaler_interval)
             self.downscaler.start()
 
         elif self.name == "OPPORTUNISTIC_OFFLINE":
             self.downscaler_stop = Event()
-            self.downscaler = OpportunisticOfflineDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler = OpportunisticOfflineDownscaler(self.downscaler_stop, self.config, self.master, self.phantom_client, self.config.downscaler_interval)
             self.downscaler.start()
 
         elif self.name == "AGGRESSIVE":
             self.downscaler_stop = Event()
-            self.downscaler = AggressiveDownscaler(self.downscaler_stop, self.config, self.master, self.config.downscaler_interval)
+            self.downscaler = AggressiveDownscaler(self.downscaler_stop, self.config, self.master, self.phantom_client, self.config.downscaler_interval)
             self.downscaler.start()
 
         self.running = True

@@ -1,5 +1,6 @@
 import logging
 from threading import Thread
+from resources.clouds import Cloud
 import time
 
 from lib.util import RemoteCommand

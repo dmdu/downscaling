@@ -1,25 +1,26 @@
 import logging
 import os
 import time
-import urlparse
 
-from boto.ec2.connection import EC2Connection
 from boto.ec2.regioninfo import RegionInfo
-from boto.regioninfo import RegionInfo
 from boto.ec2.autoscale import AutoScaleConnection
 from boto.ec2.autoscale.launchconfig import LaunchConfiguration
 from boto.ec2.autoscale import Tag
 from boto.ec2.autoscale.group import AutoScalingGroup
-from boto.ec2.connection import EC2Connection
+from resources.clouds import Clouds
 
 LOG = logging.getLogger(__name__)
 
 class PhantomClient(object):
 
-    def __init__(self, config):
+    def __init__(self, config, master):
 
         self.config = config
         self.conn = None
+        self.clouds = Clouds(config)
+        self.asg = None
+        self.master = master
+
 
     def connect(self):
 
@@ -47,7 +48,8 @@ class PhantomClient(object):
                     image_id=group['image_id'],
                     key_name=self.config.globals.key_name,
                     instance_type=group['instance_type'],
-                    security_groups=['default'])
+                    security_groups=['default'],
+                    user_data=self.master.dns)
                 LOG.info("Launch config: %s, %s, %s, %s"
                          % (launch_name, group['image_id'], self.config.globals.key_name, group['instance_type']))
 
@@ -56,7 +58,7 @@ class PhantomClient(object):
                 if old_launch_config:
                     LOG.info("Deleting old launch config %s" % (launch_name))
                     self.conn.delete_launch_configuration(old_launch_config.name)
-                    time.sleep(30)
+                    time.sleep(10)
 
                 self.conn.create_launch_configuration(launch_config)
         else:
@@ -132,7 +134,8 @@ class PhantomClient(object):
                 max_size=total_vms,
                 launch_config=launch_config,
                 tags=tags,
-                availability_zones=["us-east-1"])
+                availability_zones=["us-east-1"],
+                desired_capacity=total_vms)
 
             # delete old domains
             self.delete_all_domains()
@@ -167,31 +170,47 @@ class PhantomClient(object):
         else:
             LOG.error("No connection to Phantom")
 
-    def print_info(self):
-        if self.conn:
+    def terminate_instance(self, instance_id):
+        self.conn.terminate_instance(instance_id, decrement_capacity=True)
 
-            #print "Launch configurations:"
-            #launch_list = self.conn.get_all_launch_configurations()
-            #for launch in launch_list:
-            #    print "%s, %s, %s, %s, %s" % (launch.name, launch.key_name, launch.instance_type, launch.image_id, launch.created_time)
+    def build_instances_info(self,all_instances):
+        if not self.conn:
+            self.connect()
 
-            #print "Domain information:"
-            #all_groups = self.conn.get_all_groups()
-            #for group in all_groups:
-            #    print "Group: %s, Launch name: %s" % (group.name, group.launch_config_name)
+        instance_dict = {}
 
-            instances_string = ""
-            instance_count = 0
-            all_instances = self.conn.get_all_autoscaling_instances()
-            for instance in all_instances:
-                instances_string += "(%s,%s,%s), " % (instance.instance_id, instance.health_status, instance.lifecycle_state)
-                if instance.health_status == "Healthy":
-                    instance_count += 1
-            LOG.info("Instances: %s" % (instances_string))
-            LOG.info("Healthy instance count: %d" % (instance_count))
+        for instance in all_instances:
+            instance_dict[instance.instance_id] = {"health_status": instance.health_status,
+                                                       "lifecycle_state": instance.lifecycle_state}
+            cloud_obj = self.clouds.get_instance_cloud(instance.instance_id)
 
-        else:
-            LOG.error("No connection to Phantom")
+            if cloud_obj:
+                instance_dict[instance.instance_id]['cloud_name'] = cloud_obj.name
+                instance_obj = cloud_obj.get_instance_by_id(instance.instance_id)
+
+                if instance_obj:
+                    instance_dict[instance.instance_id]["public_dns"] = instance_obj.public_dns_name
+        return instance_dict
+
+    def get_alive_instnaces(self, all_instances):
+        instance_dict = {}
+        for instance in all_instances:
+            instance_info = all_instances[instance]
+            if 'cloud_name'  in instance_info and  "public_dns" in instance_info:
+                instance_dict[instance] = instance_info
+        return instance_dict
+
+
+
+    def get_autoscale_groups_info(self, asg_name):
+        asg_list = self.conn.get_all_groups()
+        asg_dict = {}
+        for asg in asg_list:
+            asg_dict[asg.name] = {}
+            asg_dict[asg.name]['launch_config_name'] = asg.launch_config_name
+            asg_dict[asg.name]['instances'] = self.build_instances_info(asg.instances)
+        return asg_dict
+
 
     def delete_all_launch_config(self):
         if self.conn:
@@ -211,13 +230,3 @@ class PhantomClient(object):
                 domain.delete()
         else:
             LOG.error("No connection to Phantom")
-
-    def suspend(self):
-
-        LOG.info("Suspending autoscaling group %s" % self.asg.name)
-        self.conn.suspend_processes(self.asg)
-
-    def resume(self):
-
-        LOG.info("Resuming autoscaling group %s" % self.asg.name)
-        self.conn.resume_processes(self.asg)
