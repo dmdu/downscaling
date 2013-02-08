@@ -1,6 +1,7 @@
 import logging
 import copy
 import operator
+import time
 
 from threading import Thread
 from resources.jobs import Jobs
@@ -30,6 +31,13 @@ class OpportunisticOfflineDownscaler(Thread):
 
             curr_dict = self.get_current_dict()
             jobs.update_current_list()
+
+            pool_dict_str = "%s," % (time.time())
+            for cloud_name, instance_count in curr_dict.iteritems():
+                pool_dict_str += "%s:%d," % (cloud_name,instance_count)
+            pool_dict_str = pool_dict_str[:-1]
+            filelog(self.config.worker_pool_log, pool_dict_str)
+
             for cloud_name in curr_dict:
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
                     diff = curr_dict[cloud_name] - self.desired_dict[cloud_name]
