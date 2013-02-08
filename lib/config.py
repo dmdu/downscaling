@@ -39,6 +39,22 @@ class CloudsConfig(object):
         self.config = read_config(self.file)
         self.list = self.config.sections()
 
+
+class PhantomConfig(object):
+
+    def __init__(self, file):
+        self.file = file
+        self.config = read_config(self.file)
+        default_dict = self.config.defaults()
+        self.url = default_dict['url']
+        self.port = default_dict['port']
+        self.access_id = default_dict['access_id']
+        self.secret_key = default_dict['secret_key']
+        self.launch_name = default_dict['launch_name']
+
+        self.domain_name_prefix = default_dict['domain_name']
+        self.domain_name = None # Will be assigned later based on the prefix and the timestamp
+
 class WorkersConfig(object):
 
     def __init__(self, file):
@@ -87,12 +103,15 @@ class Config(object):
         self.globals = GlobalConfig(options.global_file)
         self.master = MasterConfig(options.master_file)
         self.clouds = CloudsConfig(options.clouds_file)
+        self.phantom_config = PhantomConfig(options.phantom_file)
         self.workers = WorkersConfig(options.workers_file)
         self.workload = WorkloadConfig(options.workload_file)
         self.policy = PolicyConfig(options.policy_file)
 
         __timestamp = datetime.datetime.now()
         timestamp = __timestamp.strftime("%Y%m%d_%H%M%S")
+        self.phantom_config.domain_name = "%s_%s" % (self.phantom_config.domain_name_prefix, timestamp)
+
         self.experiment_id = timestamp
         # Create directory for all the logs
         self.log_dir = "log/%s" % (self.experiment_id)

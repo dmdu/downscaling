@@ -15,19 +15,22 @@ class Workload(Thread):
         Thread.__init__(self)
         self.config = config
         self.master = master
-        self.batches = os.listdir(self.config.workload.directory)
+        self.batch_files = os.listdir(self.config.workload.directory)
         self.interval = interval
 
-        if not self.batches:
+        if not self.batch_files:
             # Use default workload batch file (def: parsing/condor.submit)
-            self.batches = [config.workload.submit_local]
+            self.batch_files = [config.workload.submit_local]
         else:
-            self.batch_files = []
-            for batch in self.batches:
+            tmp_list = []
+            for batch in self.batch_files:
                 # Full path
-                self.batch_files.append("%s/%s" % (self.config.workload.directory, batch))
+                tmp_batch = "%s/%s" % (self.config.workload.directory, batch)
+                tmp_list.append(tmp_batch)
 
-        LOG.info("Workload batches: %s" % str(self.batch_files))
+            self.batch_files = tmp_list
+
+            LOG.info("Workload batch_files: %s" % str(self.batch_files))
 
     def run(self):
 

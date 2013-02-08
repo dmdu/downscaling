@@ -51,6 +51,9 @@ class Jobs(object):
                 user = self.config.workload.user,
                 command = self.command_job_count)
         rcmd.execute()
-        curr_number = int(rcmd.stdout)
-        return curr_number
+
+        if not rcmd.stdout:
+            return 0
+        else:
+            return int(rcmd.stdout)
 

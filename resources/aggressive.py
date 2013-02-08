@@ -1,12 +1,8 @@
 import logging
-import random
-import os
 import copy
 import operator
 
 from threading import Thread
-from resources.clouds import Cloud
-from lib.util import RemoteCommand
 from resources.jobs import Jobs
 from lib.logger import filelog
 from resources.workers import Worker
@@ -15,7 +11,7 @@ LOG = logging.getLogger(__name__)
 
 class AggressiveDownscaler(Thread):
 
-    def __init__(self, stop_event, config, master, interval=120):
+    def __init__(self, stop_event, config, master, phantom_client, interval=120):
 
         Thread.__init__(self)
         self.stop_event = stop_event
@@ -23,6 +19,7 @@ class AggressiveDownscaler(Thread):
         self.master = master
         self.interval = interval
         self.get_desired_dict()
+        self.phantom_client = phantom_client
 
     def run(self):
 
@@ -39,16 +36,20 @@ class AggressiveDownscaler(Thread):
                     candidates = self.get_cloud_instances_by_runtime_inc(cloud_name, jobs)
                     termination_list = self.select_from_candidates(cloud_name, candidates, diff)
                     for atuple in termination_list:
-                        instance = atuple[0]
-                        dns = instance.public_dns_name
+                        instance_id = atuple[0]
                         running = atuple[1]
-                        LOG.info("AD terminated instance %s in %s" % (cloud_name, instance.id))
+                        instance_info = atuple[2]
+
+                        dns = instance_info['public_dns']
+
+                        LOG.info("AD terminated instance %s in %s" % (cloud_name, instance_id))
                         filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%s" % (cloud_name, dns, running))
                         filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, instance: %s, dns: %s"
-                                                      % (cloud_name, instance.id, dns))
+                                                      % (cloud_name, instance_id, dns))
 
-                        worker = Worker(self.config, instance)
-                        worker.terminate() # terminates condor daemon and shuts down instance
+
+                        Worker(self.config, instance_id, instance_info).terminate_condor()
+                        self.phantom_client.terminate_instance(instance_id)
 
     def get_desired_dict(self):
         # assigns both the total count and the desired dict (by cloud)
@@ -61,29 +62,36 @@ class AggressiveDownscaler(Thread):
 
     def get_current_dict(self):
 
+
         pool_dict = {}
+        asg_info = self.phantom_client.get_autoscale_groups_info(self.phantom_client.asg.name)
+        all_instances_info = asg_info[self.phantom_client.asg.name]['instances']
+        instances_info = self.phantom_client.get_alive_instnaces(all_instances_info)
+
         for acloud in self.config.clouds.list:
-            cloud = Cloud(acloud, self.config)
-            # we only care about worker instances here, so don't count the master
-            count = len(cloud.get_instances(exclude_dns=self.master.dns))
-            pool_dict[acloud] = count
+            pool_dict[acloud] = 0
+            for instance_id in instances_info:
+                if instances_info[instance_id]['cloud_name'] == acloud:
+                    pool_dict[acloud] += 1
         LOG.info("AD found current instance dictionary: %s" % (str(pool_dict)))
+
+
         return pool_dict
 
     def get_cloud_instances_by_runtime_inc(self, cloud_name, jobs):
         """ Return instances in the cloud sorted by the time they have been running their jobs (increasing order) """
 
+        asg_info = self.phantom_client.get_autoscale_groups_info(self.phantom_client.asg.name)
+        all_instances_info = asg_info[self.phantom_client.asg.name]['instances']
+        instances = self.phantom_client.get_alive_instnaces(all_instances_info)
 
-        cloud = Cloud(cloud_name, self.config)
-        # we only care about worker instances here, so don't include the master
-        instances = cloud.get_instances(exclude_dns=self.master.dns)
         localjobs = copy.copy(jobs)
 
         instances_by_runtime = []
         for instance in instances:
             for job in localjobs.list:
-                if instance.public_dns_name == job.node:
-                    instances_by_runtime.append( (instance, job.running) )
+                if instances[instance]['public_dns'] == job.node:
+                    instances_by_runtime.append( (instance, job.running, instances[instance]) )
                     localjobs.list.remove(job)
                     break
 
@@ -92,7 +100,7 @@ class AggressiveDownscaler(Thread):
         # Logging
         sorted_list_str = ""
         for atuple in sorted_instances_by_runtime:
-            sorted_list_str += "%s:%s," % (atuple[0].id, atuple[1])
+            sorted_list_str += "%s:%s," % (atuple[0], atuple[1])
         LOG.info("AD found candidates for termination in %s: %s" % (cloud_name, sorted_list_str))
 
         return sorted_instances_by_runtime
