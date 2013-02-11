@@ -12,20 +12,20 @@ class Worker(object):
         self.instance = instance_id
         self.dns = instance_info['public_dns']
 
-    def terminate_condor(self):
+    def terminate_condor(self, master_dns):
 
-        command = "/etc/init.d/condor stop"
+        command = "condor_off -fast %s" % (self.dns)
         rcmd = RemoteCommand(
             config = self.config,
-            hostname = self.dns,
+            hostname = master_dns,
             ssh_private_key = self.config.globals.priv_path,
             user = 'root',
             command = command)
         code = rcmd.execute()
         if code == 0:
-            LOG.info("Successfully stopped Condor daemon on worker instance: %s" % (self.instance))
+            LOG.info("Successfully stopped Condor daemon on worker %s instance id : %s" % (self.dns, self.instance))
         else:
-            LOG.error("Error occurred during Condor daemon termination on worker instance: %s" % (self.instance))
+            LOG.error("Error occurred during Condor daemon termination on worker %s instance: %s" % (self.dns, self.instance))
 
 
     def offline(self, master_dns):
