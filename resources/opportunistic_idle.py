@@ -55,7 +55,7 @@ class OpportunisticIdleDownscaler(Thread):
                         filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, instance: %s, dns: %s"
                                                       % (cloud_name, instance_id, dns))
 
-                        Worker(self.config, instance_id, instance_info).terminate_condor()
+                        Worker(self.config, instance_id, instance_info).terminate_condor(self.master.dns)
                         self.phantom_client.terminate_instance(instance_id)
 
     def get_desired_dict(self):
