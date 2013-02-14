@@ -39,12 +39,18 @@ class AggressiveDownscaler(Thread):
             pool_dict_str = pool_dict_str[:-1]
             filelog(self.config.worker_pool_log, pool_dict_str)
 
+            diff_dict = {}
+
+            for cloud_name in curr_dict:
+                up_diff =  self.desired_dict[cloud_name] - curr_dict[cloud_name]
+                diff_dict[cloud_name] = up_diff
 
             for cloud_name in curr_dict:
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
-                    diff = curr_dict[cloud_name] - self.desired_dict[cloud_name]
+                    LOG.info("Downscaling in %s" % (cloud_name))
+                    down_diff = - diff_dict[cloud_name]
                     candidates = self.get_cloud_instances_by_runtime_inc(cloud_name, jobs)
-                    termination_list = self.select_from_candidates(cloud_name, candidates, diff)
+                    termination_list = self.select_from_candidates(cloud_name, candidates, down_diff)
                     for atuple in termination_list:
                         instance_id = atuple[0]
                         running = atuple[1]
@@ -57,9 +63,56 @@ class AggressiveDownscaler(Thread):
                         filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, instance: %s, dns: %s"
                                                       % (cloud_name, instance_id, dns))
 
-
+                        LOG.info("Desired capacity (before termination) is %d" % (self.phantom_client.asg.desired_capacity))
                         Worker(self.config, instance_id, instance_info).terminate_condor(self.master.dns)
                         self.phantom_client.terminate_instance(instance_id)
+                        LOG.info("Desired capacity (after termination) is %d" % (self.phantom_client.asg.desired_capacity))
+
+                        # figure out where to up scale
+
+                        # sort the diff dict to find cloud with max number of lack isntances ( up scale )
+                        # [('c', 10), ('a', 3), ('b', 1)]
+                        # we sort dict by value, it returns list of tuples
+                        sorted_diff_dict = sorted(diff_dict.iteritems(), key=operator.itemgetter(1), reverse=True)
+                        if sorted_diff_dict[0][1] > 0:
+                            cloud_to_upscale = sorted_diff_dict[0][0]
+
+
+                            if cloud_to_upscale != cloud_name:
+                                # create new tag :
+                                current_cloud_tag = self.phantom_client.cloud_list.split(",")
+                                new_cloud_tag = ""
+                                new_cloud_count = 0
+                                LOG.info("Current cloud tag is %s" % (self.phantom_client.cloud_list))
+                                LOG.info("Current dict is %s" % (str(curr_dict)))
+                                LOG.info("Diff dict is %s" % (str(diff_dict)))
+                                for each_cloud in current_cloud_tag:
+                                    tmp_cloud_name = each_cloud.split(":")[0]
+                                    tmp_cloud_count = int(each_cloud.split(":")[1])
+                                    if tmp_cloud_name == cloud_to_upscale:
+                                        new_cloud_tag += "%s:%d," % (tmp_cloud_name, tmp_cloud_count +1)
+                                        curr_dict[tmp_cloud_name] += 1
+                                        diff_dict[tmp_cloud_name] -= 1
+                                    elif tmp_cloud_name == cloud_name:
+                                        new_cloud_tag += "%s:%d," % (tmp_cloud_name, tmp_cloud_count - 1)
+                                        curr_dict[tmp_cloud_name] -= 1
+                                        diff_dict[tmp_cloud_name] += 1
+                                    else:
+                                        new_cloud_tag += "%s:%d," % (tmp_cloud_name, tmp_cloud_count)
+                                    new_cloud_count += curr_dict[tmp_cloud_name]
+
+                                new_cloud_tag_no_comma = new_cloud_tag[:-1]
+                                LOG.info("New cloud tag is %s" % (new_cloud_tag_no_comma))
+                                LOG.info("New Current dict is %s" % (str(curr_dict)))
+                                LOG.info("New Diff dict is %s" % (str(diff_dict)))
+                                LOG.info("New Desired capacity (after recounting) is %d" % (new_cloud_count))
+
+                                self.phantom_client.update_tags(new_cloud_tag_no_comma, new_cloud_count)
+                                self.phantom_client.cloud_list = new_cloud_tag_no_comma
+                                self.phantom_client.asg.set_capacity(new_cloud_count)
+                            else:
+                                LOG.info("Trying to upscale and downscale in the same cloud .. STOPPED")
+
 
     def get_desired_dict(self):
         # assigns both the total count and the desired dict (by cloud)
@@ -99,6 +152,8 @@ class AggressiveDownscaler(Thread):
 
         instances_by_runtime = []
         for instance in instances:
+            if instances[instance]['cloud_name'] != cloud_name:
+                continue
             for job in localjobs.list:
                 if instances[instance]['public_dns'] == job.node:
                     instances_by_runtime.append( (instance, job.running, instances[instance]) )
