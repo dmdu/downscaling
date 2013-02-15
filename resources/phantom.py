@@ -20,6 +20,7 @@ class PhantomClient(object):
         self.clouds = Clouds(config)
         self.asg = None
         self.master = master
+        self.cloud_list = None
 
 
     def connect(self):
@@ -141,6 +142,7 @@ class PhantomClient(object):
             self.delete_all_domains()
 
             self.conn.create_auto_scaling_group(self.asg)
+            self.cloud_list = cloud_list
         else:
             LOG.error("No connection to Phantom")
 
