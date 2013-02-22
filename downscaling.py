@@ -69,7 +69,7 @@ class Downscaling(Thread):
 
         self.phantom_client.delete_all_launch_config()
         self.phantom_client.delete_all_domains()
-        self.master.terminate()
+        #self.master.terminate()
 
         return
 

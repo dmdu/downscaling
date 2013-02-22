@@ -86,9 +86,47 @@ class CondorParser(object):
                 elapsed_time = time.mktime(condor_jobs.terminated_time) - time.mktime(condor_jobs.scheduled_time)
                 file_obj.write("Arguments = %d\nQueue\n" % (int(elapsed_time)))
 
+    def create_submitfiles(self, dest_file_suffix):
+
+        sorted_sub_time = sorted([ x.submitted_time for x in self.condor_jobs_db.values() ])
+
+        template = "Universe = vanilla\nExecutable = sleep\nLog = sleep.log\nOutput = sleep.out\nError = sleep.error\n"
+
+        last_job_index = len(sorted_sub_time) - 1
+
+        for index in range(len(sorted_sub_time)):
+            each = sorted_sub_time[index]
+            for job_id, condor_job in self.condor_jobs_db.iteritems():
+                if each == condor_job.submitted_time:
+                    index_str = str(index)
+                    file_name = "%s%s" % (index_str.zfill(5), dest_file_suffix)
+                    with open(file_name, 'w') as file_obj:
+                        file_obj.write(template)
+                        elapsed_time = time.mktime(condor_job.terminated_time) - time.mktime(condor_job.scheduled_time)
+
+                        #print "Index %d" % index
+                        #print "Last job index %d" % last_job_index
+                        if index == last_job_index:
+                            #sleep_time = 3 * elapsed_time
+                            sleep_time = 120
+                        else:
+                            next_submit_time = sorted_sub_time[index + 1]
+                            submit_time = condor_job.submitted_time
+                            sleep_time = time.mktime(next_submit_time) - time.mktime(submit_time)
+
+                        file_obj.write("Arguments = %d\nQueue\n#SLEEP %d\n" % (int(elapsed_time), int(sleep_time)))
+                    index += 1
+                    print condor_job
+
 # Usage Note :
-log_file = "condor.log"
+# log_file = "gradual.log"
+# cp = CondorParser(log_file)
+# cp.parse_file()
+# cp.show()
+# cp.create_submitfile("condor.submit")
+
+log_file = "gradual.log"
 cp = CondorParser(log_file)
 cp.parse_file()
 cp.show()
-cp.create_submitfile("condor.submit")
+cp.create_submitfiles(".submit")

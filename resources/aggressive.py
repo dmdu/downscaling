@@ -141,6 +141,7 @@ class AggressiveDownscaler(Thread):
 
         return pool_dict
 
+
     def get_cloud_instances_by_runtime_inc(self, cloud_name, jobs):
         """ Return instances in the cloud sorted by the time they have been running their jobs (increasing order) """
 
@@ -150,15 +151,20 @@ class AggressiveDownscaler(Thread):
 
         localjobs = copy.copy(jobs)
 
+
         instances_by_runtime = []
         for instance in instances:
             if instances[instance]['cloud_name'] != cloud_name:
                 continue
+            job_matching_found = False
             for job in localjobs.list:
                 if instances[instance]['public_dns'] == job.node:
                     instances_by_runtime.append( (instance, job.running, instances[instance]) )
                     localjobs.list.remove(job)
+                    job_matching_found = True
                     break
+            if not job_matching_found:
+                instances_by_runtime.append( (instance, "0", instances[instance]) )
 
         sorted_instances_by_runtime = sorted(instances_by_runtime, key=operator.itemgetter(1))
 
