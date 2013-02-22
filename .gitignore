@@ -42,8 +42,9 @@ log/*
 
 .DS_Store
 
-parsing/condor.submit
+parsing/*.submit
 workload/*.submit
+graphing/*.png
 
 #Dmitry's debugging file
 tests/dmdu.py

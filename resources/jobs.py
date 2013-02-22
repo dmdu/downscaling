@@ -38,9 +38,21 @@ class Jobs(object):
             items = queue_state.split()
             if self.config.workload.user in items:
                 start = items.index(self.config.workload.user) - 1
+
+                uc = 0
+                sdcs = 0
+                total = 0
                 for i in range(start, len(items), 6):
-                    print "Job %s running for %s on %s" % (items[i], items[i+4], items[i+5])
+                    #print "Job %s running for %s on %s" % (items[i], items[i+4], items[i+5])
                     self.list.append(Job(items[i], items[i+4], items[i+5]))
+                    node = items[i+5]
+                    if "uc" in node:
+                        uc += 1
+                    if "sdcs" in node:
+                        sdcs += 1
+                    total += 1
+                print "Jobs: total: %d, Hotel: %d, Sierra: %d" % (total, uc, sdcs)
+
 
     def get_current_number(self):
 

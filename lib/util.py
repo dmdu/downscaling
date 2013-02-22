@@ -13,6 +13,8 @@ from lib.logger import filelog
 
 LOG = logging.getLogger(__name__)
 
+# Less information from paramiko (fabric)
+logging.getLogger("paramiko").setLevel(logging.WARNING)
 
 class Command(object):
     def __init__(self, args=[]):

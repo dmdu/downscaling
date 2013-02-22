@@ -23,8 +23,14 @@ class InitialMonitor(Thread):
         time.sleep(240)
         self.start_timestamp = time.time()
 
-        LOG.info("Activating Initial Monitor. Expecting workers: %d, sleep period: %d sec, time limit: %d sec"
-                 % (self.expected_worker_count, self.interval, self.limit))
+        # No-change limit: if the worker_count does not change for this much, continue anyways
+        nochange_limit = 25*60
+        nochange_beginning = time.time()
+        prev_worker_count = 0
+        first_time_nochange = True
+
+        LOG.info("Activating Initial Monitor. Expecting workers: %d, sleep period: %d sec, time limit: %d sec, no change limit: %d"
+                 % (self.expected_worker_count, self.interval, self.limit, nochange_limit))
         while True:
             time.sleep(self.interval)
 
@@ -37,6 +43,23 @@ class InitialMonitor(Thread):
                 LOG.info("Terminating Unpropagated and Corrupted instances. Leaving only running instances")
                 self.terminate_all_but_running_instances()
                 break
+
+            # No change control: make sure that this monitor does not "freeze" for longer than nochange_limit
+            if prev_worker_count == worker_count:
+                if first_time_nochange:
+                    nochange_beginning = time.time()
+                else:
+                    first_time_nochange = False
+                    nochange_elapsed = time.time() - nochange_beginning
+                    if nochange_elapsed > nochange_limit:
+                        LOG.info("%d worker(s) registered and Idle. %d worker(s) expected. No-change limit has been exceeded"
+                                 % (worker_count, self.expected_worker_count))
+                        LOG.info("Terminating Unpropagated and Corrupted instances. Leaving only running instances that are in the pool")
+                        self.terminate_all_but_running_instances()
+                        break
+            else:
+                prev_worker_count = worker_count
+                first_time_nochange = True
 
             if worker_count == self.expected_worker_count:
                 LOG.info("%d worker(s) registered with the master and Idle (as expected). Terminating Initial Monitor"
