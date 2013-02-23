@@ -119,14 +119,14 @@ class CondorParser(object):
                     print condor_job
 
 # Usage Note :
+log_file = "large.log"
+cp = CondorParser(log_file)
+cp.parse_file()
+cp.show()
+cp.create_submitfile("condor.submit")
+
 # log_file = "gradual.log"
 # cp = CondorParser(log_file)
 # cp.parse_file()
 # cp.show()
-# cp.create_submitfile("condor.submit")
-
-log_file = "gradual.log"
-cp = CondorParser(log_file)
-cp.parse_file()
-cp.show()
-cp.create_submitfiles(".submit")
+# cp.create_submitfiles(".submit")

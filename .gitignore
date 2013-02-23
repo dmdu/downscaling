@@ -43,6 +43,8 @@ log/*
 .DS_Store
 
 parsing/*.submit
+parsing/*.xls
+parsing/*.log
 workload/*.submit
 graphing/*.png
 

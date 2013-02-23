@@ -12,7 +12,7 @@ LOG = logging.getLogger(__name__)
 
 class OpportunisticOfflineDownscaler(Thread):
 
-    def __init__(self, stop_event, config, master, phantom_client, interval=120):
+    def __init__(self, stop_event, config, master, phantom_client, interval=120, check_within_interval_limit=20):
 
         Thread.__init__(self)
         self.stop_event = stop_event
@@ -22,12 +22,31 @@ class OpportunisticOfflineDownscaler(Thread):
         self.phantom_client = phantom_client
         self.get_desired_dict()
 
+        self.check_within_interval_limit = check_within_interval_limit
+        self.check_within_interval_counter = 0
+        self.marked_offline_list = []
+
     def run(self):
 
         LOG.info("Activating OO. Sleep period: %d sec" % (self.interval))
         jobs = Jobs(self.config, self.master.dns)
+
         while(not self.stop_event.is_set()):
+
             self.stop_event.wait(self.interval)
+
+            # Figure out what type of iteration this is:
+            # - either when the counter equals the limit -- then try marking nodes offline
+            # - any other iteration -- then only terminate idle instances if any in the marked_offline_list
+            self.check_within_interval_counter += 1
+            if self.check_within_interval_counter == self.self.check_within_interval_limit:
+                allow_marking_offline = True
+                # Rest and go back to the beginning of the cycle
+                self.check_within_interval_counter = 0
+                LOG.info("OI's iteration with marking nodes offline and termination of idle instances")
+            else:
+                allow_marking_offline = False
+                LOG.info("OI's iteration with termination of previously marked instances")
 
             curr_dict = self.get_current_dict()
             jobs.update_current_list()
@@ -49,7 +68,23 @@ class OpportunisticOfflineDownscaler(Thread):
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
                     LOG.info("Downscaling in %s" % (cloud_name))
                     down_diff = - diff_dict[cloud_name]
-                    idle_candidates, nonidle_candidates = self.get_candidates(cloud_name, jobs, down_diff)
+
+                    if not allow_marking_offline:
+                        # give me all idle_instances that are in self.marked_offline_list
+                        # only these instances are allowed to be terminated
+                        if self.marked_offline_list:
+                            candidates = self.get_candidates(cloud_name, jobs, down_diff, return_only_all_idle=True)
+                            idle_candidates = []
+                            for cand in candidates:
+                                ins_id = cand[0]
+                                if tuple_id in self.marked_offline_list:
+                                    idle_candidates.append(ins_id)
+                                    LOG.info("Selecting idle offline instance for termination: %s" % (ins_id))
+                                    self.marked_offline_list.remove(ins_id)
+                        else:
+                            idle_candidates = []
+                    else:
+                        idle_candidates, nonidle_candidates = self.get_candidates(cloud_name, jobs, down_diff, return_only_all_idle=False)
 
                     for instance_tuple in idle_candidates:
                         instance_id = instance_tuple[0]
@@ -106,17 +141,19 @@ class OpportunisticOfflineDownscaler(Thread):
                             else:
                                 LOG.info("Trying to upscale and downscale in the same cloud .. STOPPED")
 
+                    if allow_marking_offline:
+                        for instance_tuple in nonidle_candidates:
+                            instance_id = instance_tuple[0]
+                            instance_info = instance_tuple[1]
+                            dns = instance_info['public_dns']
+                            LOG.info("OO marked instance offline %s in %s" % (cloud_name, instance_id))
+                            filelog(self.config.node_log, "OFFLINED WORKER cloud: %s, instance: %s, dns: %s"
+                                                          % (cloud_name, instance_id, dns))
+                            filelog(self.config.discarded_work_log, "OFFLINE,%s,%s,%d" % (cloud_name, dns, 0))
 
-                    for instance_tuple in nonidle_candidates:
-                        instance_id = instance_tuple[0]
-                        instance_info = instance_tuple[1]
-                        dns = instance_info['public_dns']
-                        LOG.info("OO marked instance offline %s in %s" % (cloud_name, instance_id))
-                        filelog(self.config.node_log, "OFFLINED WORKER cloud: %s, instance: %s, dns: %s"
-                                                      % (cloud_name, instance_id, dns))
-
-                        worker = Worker(self.config, instance_id, instance_info)
-                        worker.offline(self.master.dns) # marks node offline (it later becomes idle and get terminated)
+                            worker = Worker(self.config, instance_id, instance_info)
+                            worker.offline(self.master.dns) # marks node offline (it later becomes idle and get terminated)
+                            self.marked_offline_list.append(instance_id)
 
 
     def get_desired_dict(self):
@@ -147,7 +184,7 @@ class OpportunisticOfflineDownscaler(Thread):
         return pool_dict
 
 
-    def get_candidates(self, cloud_name, jobs, count):
+    def get_candidates(self, cloud_name, jobs, count, return_only_all_idle=False):
         """ Returns two lists of instances that should be terminated.
             idle_list: if there are any idle instances they will be returned in this list (and can be hard terminated).
             nonidle_list: if count > number of idle instances, then this list will include non-idle instances
@@ -180,6 +217,11 @@ class OpportunisticOfflineDownscaler(Thread):
 
         # Truncate idle list if needed (in case there are more idle instances than count)
         # Does not do anything if count >= len(idle_list)
+
+        if return_only_all_idle:
+            # DONE if this flag is set
+            return idle_list
+
         idle_list = idle_list[:count]
 
         if idle_list:
