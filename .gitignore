@@ -39,13 +39,13 @@ nosetests.xml
 
 #Logs
 log/*
+downscaling.log
 
 .DS_Store
 
 parsing/*.submit
 parsing/*.xls
 parsing/*.log
-workload/*.submit
 graphing/*.png
 
 #Dmitry's debugging file

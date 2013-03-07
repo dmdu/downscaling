@@ -12,19 +12,20 @@ LOG = logging.getLogger(__name__)
 
 class OpportunisticOfflineDownscaler(Thread):
 
-    def __init__(self, stop_event, config, master, phantom_client, interval=120, check_within_interval_limit=20):
+    def __init__(self, stop_event, config, master, phantom_client, interval=120, check_within_interval_limit=6):
 
         Thread.__init__(self)
         self.stop_event = stop_event
         self.config = config
         self.master = master
-        self.interval = interval
+        self.interval = int(float(interval)/check_within_interval_limit)
         self.phantom_client = phantom_client
         self.get_desired_dict()
 
         self.check_within_interval_limit = check_within_interval_limit
         self.check_within_interval_counter = 0
         self.marked_offline_list = []
+        self.marked_offline_list_for_sure_empty = True
 
     def run(self):
 
@@ -39,14 +40,16 @@ class OpportunisticOfflineDownscaler(Thread):
             # - either when the counter equals the limit -- then try marking nodes offline
             # - any other iteration -- then only terminate idle instances if any in the marked_offline_list
             self.check_within_interval_counter += 1
-            if self.check_within_interval_counter == self.self.check_within_interval_limit:
+            if self.check_within_interval_counter == self.check_within_interval_limit:
                 allow_marking_offline = True
+                self.marked_offline_list_for_sure_empty = False
                 # Rest and go back to the beginning of the cycle
                 self.check_within_interval_counter = 0
-                LOG.info("OI's iteration with marking nodes offline and termination of idle instances")
+                LOG.info("OO's iteration with marking nodes offline and termination of idle instances")
             else:
                 allow_marking_offline = False
-                LOG.info("OI's iteration with termination of previously marked instances")
+                LOG.info("OO's iteration with termination of previously marked instances. Iteration: %d of %d" 
+                              % (self.check_within_interval_counter, self.check_within_interval_limit))
 
             curr_dict = self.get_current_dict()
             jobs.update_current_list()
@@ -57,6 +60,10 @@ class OpportunisticOfflineDownscaler(Thread):
             pool_dict_str = pool_dict_str[:-1]
             filelog(self.config.worker_pool_log, pool_dict_str)
 
+            if self.marked_offline_list_for_sure_empty:
+                LOG.info("Empty list. Continuing")
+                continue
+                
             diff_dict = {}
 
             for cloud_name in curr_dict:
@@ -66,8 +73,8 @@ class OpportunisticOfflineDownscaler(Thread):
 
             for cloud_name in curr_dict:
                 if curr_dict[cloud_name] > self.desired_dict[cloud_name]:
-                    LOG.info("Downscaling in %s" % (cloud_name))
                     down_diff = - diff_dict[cloud_name]
+                    LOG.info("Downscaling in %s, trying to downscale %d instance(s)." % (cloud_name, down_diff))
 
                     if not allow_marking_offline:
                         # give me all idle_instances that are in self.marked_offline_list
@@ -77,8 +84,8 @@ class OpportunisticOfflineDownscaler(Thread):
                             idle_candidates = []
                             for cand in candidates:
                                 ins_id = cand[0]
-                                if tuple_id in self.marked_offline_list:
-                                    idle_candidates.append(ins_id)
+                                if ins_id in self.marked_offline_list:
+                                    idle_candidates.append(cand)
                                     LOG.info("Selecting idle offline instance for termination: %s" % (ins_id))
                                     self.marked_offline_list.remove(ins_id)
                         else:
