@@ -211,7 +211,7 @@ class AggressiveDownscaler(Thread):
         second_stage_candidates = []
         for candidate in first_stage_candidates:
             # check progress (not running)
-            if candidate[3] < self.config.threshold:
+            if float(candidate[3]) < float(self.config.threshold):
                 second_stage_candidates.append(candidate)
 
         return second_stage_candidates
