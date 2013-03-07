@@ -33,10 +33,10 @@ class Job(object):
             if not self.walltime:
                 LOG.error("Error in calculating progress for job %s. Walltime is unknown" % (self.id))
                 return 0.0
-            if runtime_seconds <= self.walltime:
-                return float(runtime_seconds)/self.walltime
+            if float(runtime_seconds) <= float(self.walltime):
+                return float(runtime_seconds)/float(self.walltime)
             else:
-                LOG.error("Error in calculating progress for job %s. Runtime(%ds) > Walltime(%ds)" % (self.id, runtime_seconds, self.walltime))
+                LOG.error("Error in calculating progress for job %s. Runtime(%ss) > Walltime(%ss)" % (self.id, str(runtime_seconds), str(self.walltime)))
                 return 1.0
         else:
             LOG.error("Error in parsing info for job %s. Can't find '+' in job's runtime: %s"  % (self.id, self.running))
@@ -85,7 +85,7 @@ class Jobs(object):
                     else:
                         walltime = None
 
-                    self.list.append(Job(job_id, items[i+4], items[i+5]), walltime)
+                    self.list.append(Job(job_id, items[i+4], items[i+5], walltime))
 
                     node = items[i+5]
                     if "uc" in node:
