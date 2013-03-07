@@ -11,6 +11,9 @@ class Job(object):
         self.running = running
         self.node = node
 
+        self.walltime = None
+        self.progress = None
+
 class Jobs(object):
 
     def __init__(self, config, master_dns):
