@@ -26,6 +26,9 @@ class AggressiveDownscaler(Thread):
     def run(self):
 
         LOG.info("Activating AD. Sleep period: %d sec" % (self.interval))
+
+        time.sleep(20) # To allow jobs to be added to the queue
+
         jobs = Jobs(self.config, self.master.dns)
         while(not self.stop_event.is_set()):
             self.stop_event.wait(self.interval)
@@ -55,11 +58,12 @@ class AggressiveDownscaler(Thread):
                         instance_id = atuple[0]
                         running = atuple[1]
                         instance_info = atuple[2]
+                        progress = atuple[3]
 
                         dns = instance_info['public_dns']
 
                         LOG.info("AD terminated instance %s in %s" % (cloud_name, instance_id))
-                        filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%s" % (cloud_name, dns, running))
+                        filelog(self.config.discarded_work_log, "DISCARDED,%s,%s,%d,%f" % (cloud_name, dns, running, progress))
                         filelog(self.config.node_log, "TERMINATED WORKER cloud: %s, instance: %s, dns: %s"
                                                       % (cloud_name, instance_id, dns))
 
@@ -145,6 +149,9 @@ class AggressiveDownscaler(Thread):
     def get_cloud_instances_by_runtime_inc(self, cloud_name, jobs):
         """ Return instances in the cloud sorted by the time they have been running their jobs (increasing order) """
 
+         # ATTENTION: This function has nothing to do with the runtime anymore
+         # It sorts jobs by their progress = runtime/walltime (if available)
+
         asg_info = self.phantom_client.get_autoscale_groups_info(self.phantom_client.asg.name)
         all_instances_info = asg_info[self.phantom_client.asg.name]['instances']
         instances = self.phantom_client.get_alive_instnaces(all_instances_info)
@@ -159,19 +166,24 @@ class AggressiveDownscaler(Thread):
             job_matching_found = False
             for job in localjobs.list:
                 if instances[instance]['public_dns'] == job.node:
-                    instances_by_runtime.append( (instance, job.running, instances[instance]) )
+
+                    #instances_by_runtime.append( (instance, job.running, instances[instance]) )
+                    instances_by_runtime.append( (instance, job.running, instances[instance], job.progress) )
+
                     localjobs.list.remove(job)
                     job_matching_found = True
                     break
             if not job_matching_found:
-                instances_by_runtime.append( (instance, "0", instances[instance]) )
+                # idle
+                instances_by_runtime.append( (instance, 0, instances[instance], 0.0) )
 
-        sorted_instances_by_runtime = sorted(instances_by_runtime, key=operator.itemgetter(1))
+        #sorted_instances_by_runtime = sorted(instances_by_runtime, key=operator.itemgetter(1))
+        sorted_instances_by_runtime = sorted(instances_by_runtime, key=operator.itemgetter(3)) # sort by progress
 
         # Logging
         sorted_list_str = ""
         for atuple in sorted_instances_by_runtime:
-            sorted_list_str += "%s:%s," % (atuple[0], atuple[1])
+            sorted_list_str += "%s:%d:%f," % (atuple[0], atuple[1], atuple[3])
         LOG.info("AD found candidates for termination in %s: %s" % (cloud_name, sorted_list_str))
 
         return sorted_instances_by_runtime
@@ -198,7 +210,8 @@ class AggressiveDownscaler(Thread):
         # Select candidates with less than threshold amount of work accomplished
         second_stage_candidates = []
         for candidate in first_stage_candidates:
-            if candidate[1] < self.config.threshold:
+            # check progress (not running)
+            if candidate[3] < self.config.threshold:
                 second_stage_candidates.append(candidate)
 
         return second_stage_candidates
