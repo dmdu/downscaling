@@ -28,10 +28,12 @@ class Cleanup(Thread):
 
         phantom_client = PhantomClient(self.config, master=None)
         phantom_client.connect()
-        phantom_client.delete_all_launch_configs()
-        phantom_client.delete_all_asgs()
+        phantom_client.delete_all_launch_config()
+        phantom_client.delete_all_domains()
 
-        print phantom_client.get_asgs_info()
+        all_domains = phantom_client.conn.get_all_groups()
+        for domain in all_domains:
+            print phantom_client.get_autoscale_groups_info(domain.name)
 
 def main():
     (options, args) = parse_options()
