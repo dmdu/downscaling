@@ -150,7 +150,7 @@ class Cloud(object):
         for reservation in all_reservations:
             for instance in reservation.instances:
                 if not (instance.state == "running"):
-                    LOG.info("Instance %s in cloud %d isn't running. Terminating it" % (self.name, instance.id))
+                    LOG.info("Instance %s in cloud %s isn't running. Terminating it" % (self.name, instance.id))
                     instance.terminate()
 
 
