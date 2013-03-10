@@ -8,11 +8,20 @@ class CondorJob(object):
         self.submitted_time = None
         self.scheduled_time = None
         self.terminated_time = None
+        self.evicted_time = None
+        self.rescheduled_time = None
 
     def __str__(self):
-        return "Job id is %s, was submitted on %s and scheduled on %s and terminated on %s" % (
+        if not self.evicted_time:
+            return "Job id is %s, was submitted on %s and scheduled on %s and terminated on %s" % (
             self.id, time.strftime("%m-%d %H:%M:%S", self.submitted_time) ,
             time.strftime("%m-%d %H:%M:%S",self.scheduled_time), time.strftime("%m-%d %H:%M:%S", self.terminated_time))
+        else:
+            return "Job id is %s, was submitted on %s and scheduled on %s and terminated on %s and evicted on %s and rescheduled on %s" % (
+                self.id, time.strftime("%m-%d %H:%M:%S", self.submitted_time) ,
+                time.strftime("%m-%d %H:%M:%S",self.scheduled_time), time.strftime("%m-%d %H:%M:%S", self.terminated_time),
+                time.strftime("%m-%d %H:%M:%S",self.evicted_time), time.strftime("%m-%d %H:%M:%S",self.rescheduled_time))
+
 
 
 class CondorParser(object):
@@ -28,7 +37,7 @@ class CondorParser(object):
             job_month = line_as_array[2].split("/")[0]
             job_day = line_as_array[2].split("/")[1]
             job_time = line_as_array[3]
-            job_timestamp = time.strptime("2012-%s-%s %s" % (job_month, job_day, job_time),"%Y-%m-%d %H:%M:%S")
+            job_timestamp = time.strptime("2013-%s-%s %s" % (job_month, job_day, job_time),"%Y-%m-%d %H:%M:%S")
             condor_job = CondorJob()
 
             if line_type == "submitted":
@@ -37,6 +46,8 @@ class CondorParser(object):
                 condor_job.scheduled_time = job_timestamp
             elif line_type == "terminated":
                 condor_job.terminated_time = job_timestamp
+            elif line_type == "evicted":
+                condor_job.evicted_time = job_timestamp
             condor_job.id = job_id
             return condor_job
         except :
@@ -51,11 +62,22 @@ class CondorParser(object):
         if not stored_job.submitted_time and condor_job.submitted_time:
             self.condor_jobs_db[stored_job.id].submitted_time = condor_job.submitted_time
 
-        elif not stored_job.scheduled_time and condor_job.scheduled_time:
-            self.condor_jobs_db[stored_job.id].scheduled_time = condor_job.scheduled_time
+        elif condor_job.scheduled_time:
+            if not stored_job.scheduled_time:
+                self.condor_jobs_db[stored_job.id].scheduled_time = condor_job.scheduled_time
+            else:
+                self.condor_jobs_db[stored_job.id].rescheduled_time = condor_job.scheduled_time
+
+
+        #elif not stored_job.scheduled_time and condor_job.scheduled_time:
+        #    self.condor_jobs_db[stored_job.id].scheduled_time = condor_job.scheduled_time
 
         elif not stored_job.terminated_time and condor_job.terminated_time:
             self.condor_jobs_db[stored_job.id].terminated_time = condor_job.terminated_time
+
+        elif not stored_job.evicted_time and condor_job.evicted_time:
+            self.condor_jobs_db[stored_job.id].evicted_time = condor_job.evicted_time
+
 
 
     def parse_file(self):
@@ -70,6 +92,8 @@ class CondorParser(object):
 
                 elif log_line.find("Job terminated.") != -1:
                     condor_job = self.parse_line(log_line, "terminated")
+                elif log_line.find("Job was evicted") != -1:
+                    condor_job = self.parse_line(log_line, "evicted")
 
                 if condor_job:
                     self.store_job(condor_job)
@@ -117,16 +141,3 @@ class CondorParser(object):
                         file_obj.write("Arguments = %d\nQueue\n#SLEEP %d\n" % (int(elapsed_time), int(sleep_time)))
                     index += 1
                     print condor_job
-
-# Usage Note :
-log_file = "large.log"
-cp = CondorParser(log_file)
-cp.parse_file()
-cp.show()
-cp.create_submitfile("condor.submit")
-
-# log_file = "gradual.log"
-# cp = CondorParser(log_file)
-# cp.parse_file()
-# cp.show()
-# cp.create_submitfiles(".submit")
