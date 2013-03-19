@@ -30,6 +30,9 @@ class OpportunisticOfflineDownscaler(Thread):
     def run(self):
 
         LOG.info("Activating OO. Sleep period: %d sec" % (self.interval))
+
+        time.sleep(20) # To allow jobs to be added to the queue
+
         jobs = Jobs(self.config, self.master.dns)
 
         while(not self.stop_event.is_set()):
@@ -215,7 +218,9 @@ class OpportunisticOfflineDownscaler(Thread):
             job_matching_found = False
             for job in localjobs.list:
                 if instances[instance]['public_dns'] == job.node:
-                    nonidle_list.append( (instance, job.running, instances[instance]) )
+                    #nonidle_list.append( (instance, job.running, instances[instance]) )
+                    nonidle_list.append( (instance, job.progress, instances[instance]) )
+
                     localjobs.list.remove(job)
                     job_matching_found = True
                     break
