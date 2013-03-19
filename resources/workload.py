@@ -122,6 +122,11 @@ class Workload(Thread):
             print "Job count: %d" % (count)
 
         LOG.info("Workload completed")
+        self.scp_log_back()
+
+        # To let the policy do the adjustment, sleep for 30 mins
+        #LOG.info("Sleeping for 30 mins")
+        #time.sleep(1800)
 
     def scp_log_back(self):
 
