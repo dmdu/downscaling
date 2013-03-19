@@ -25,13 +25,15 @@ class OpportunisticIdleDownscaler(Thread):
     def run(self):
 
         LOG.info("Activating OI. Sleep period: %d sec" % (self.interval))
+
+        time.sleep(20) # To allow jobs to be added to the queue
+
         jobs = Jobs(self.config, self.master.dns)
         while(not self.stop_event.is_set()):
             self.stop_event.wait(self.interval)
 
             curr_dict = self.get_current_dict()
             jobs.update_current_list()
-
 
             pool_dict_str = "%s," % (time.time())
             for cloud_name, instance_count in curr_dict.iteritems():

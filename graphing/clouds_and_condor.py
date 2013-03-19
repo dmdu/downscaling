@@ -155,10 +155,12 @@ class CondorAndJobs(object):
             for index in range_to_alter:
                 jobs[index] += 1
 
+        # dmdu
+        for i in range(0, len(jobs)):
+            if jobs[i] > 64:
+                jobs[i] = 64
+
         return x_values, jobs
-
-
-
 
 
     def draw(self):
@@ -194,8 +196,8 @@ class CondorAndJobs(object):
         ax2.set_ylabel("Jobs Running")
         ax2.set_ylim(0, 70)
         ax.set_ylim(0,1150)
-        ax.set_xlim(0,12000.0)
-        ax2.set_xlim(0,12000.0)
+        ax.set_xlim(0,10000.0)
+        ax2.set_xlim(0,10000.0)
 
 
         # clouds

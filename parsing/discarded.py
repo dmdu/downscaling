@@ -12,7 +12,7 @@ class DiscardedCyclesCounter(object):
         with open(self.file_name) as file_object:
             for line in file_object:
                 items = line.split(',')
-                #print items[3]
+                print items[3]
                 sum += int(items[3])
         return sum
 
