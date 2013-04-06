@@ -2,6 +2,13 @@
 # a bar plot with errorbars
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib
+
+
+font = {'family' : 'normal',
+        'size'   : 16}
+
+matplotlib.rc('font', **font)
 
 N = 4
 ind = np.arange(N)  # the x locations for the groups
@@ -31,7 +38,7 @@ ax3.set_xticks(ind+0.5*width)
 ax3.set_xticklabels( ('OI', 'FO', 'AP-25', 'AP-100'), rotation=90)
 rects3 = ax3.bar(ind, cMeans, width, yerr=cStd, ecolor='black', label='Aggressive', color = palette)
 box3 = ax3.get_position()
-ax3.set_position([box3.x0, box3.y0+box3.height*0.2 , box3.width*0.8, box3.height*0.7])
+ax3.set_position([box3.x0+box3.width*0.1, box3.y0+box3.height*0.2 , box3.width*0.8, box3.height*0.7])
 ax3.set_ylim(0,4.0)
 
 ax2 = fig.add_subplot(133)

@@ -9,6 +9,14 @@ import time
 from lib.util import read_config
 from parsing import log_parser
 
+import matplotlib
+
+
+font = {'family' : 'normal',
+        'size'   : 14}
+
+matplotlib.rc('font', **font)
+
 class CondorAndJobs(object):
 
     def __init__(self, input_dir):
@@ -155,6 +163,10 @@ class CondorAndJobs(object):
             for index in range_to_alter:
                 jobs[index] += 1
 
+            for ind,j in enumerate(jobs):
+                if j > 64:
+                    jobs[ind] = 64
+
         return x_values, jobs
 
 
@@ -169,14 +181,18 @@ class CondorAndJobs(object):
         ax = fig.add_subplot(2,1,1)
 
         cx, cy = self.generate_completed_time_data()
-        lns1 = ax.plot(cx,cy, '-g', label="completed")
+        lns1 = ax.plot(cx,cy, '-g', label="Completed")
 
         sx, sy = self.generate_submitted_time_data()
-        lns2 = ax.plot(sx,sy, '-b', label="submitted")
+        lns2 = ax.plot(sx,sy, '-b', label="Submitted")
 
         rx, ry = self.generate_running_time_data()
         ax2 = ax.twinx()
-        lns3 = ax2.plot(rx, ry, '-r', label = 'running')
+        lns3 = ax2.plot(rx, ry, '-r', label = 'Running')
+
+        # adjust location
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + box.height * 0.25, box.width, box.height*0.8])
 
         # to hide the first zeros in x and y axis
         frame1 = matplotlib.pyplot.gca()
@@ -186,16 +202,20 @@ class CondorAndJobs(object):
         # to group the legend of job running and completed/submitted together
         lns = lns1+lns2+lns3
         labs = [l.get_label() for l in lns]
-        ax.legend(lns, labs, loc=6, prop={'size':10})
+        ax.legend(lns, labs, loc=6, prop={'size':14})
 
         # set labels and limit
-        ax.set_xlabel("Second")
-        ax.set_ylabel("Jobs Submitted / Complete")
+        ax.set_xlabel("Seconds")
+        ax.set_ylabel("Jobs Submitted/Completed")
         ax2.set_ylabel("Jobs Running")
         ax2.set_ylim(0, 70)
         ax.set_ylim(0,1150)
-        ax.set_xlim(0,12000.0)
-        ax2.set_xlim(0,12000.0)
+        ax.set_xlim(0,10000.0)
+        ax2.set_xlim(0,10000.0)
+
+        # adjust location
+        box = ax2.get_position()
+        ax2.set_position([box.x0, box.y0 + box.height * 0.25, box.width, box.height*0.8])
 
 
         # clouds
@@ -247,11 +267,10 @@ class CondorAndJobs(object):
 
         # Put a legend below current axis
         box = ax3.get_position()
-        ax3.set_position([box.x0, box.y0 + box.height * 0.1,
-                 box.width, box.height * 0.9])
-        ax3.legend(loc=8, bbox_to_anchor=(0.5, -0.4), ncol=4, prop={'size':10})
+        ax3.set_position([box.x0, box.y0 + box.height * 0.35, box.width, box.height * 0.8])
+        ax3.legend(loc=8, bbox_to_anchor=(0.5, -0.75), ncol=2, prop={'size':14})
 
-        ax3.set_xlabel("Second")
+        ax3.set_xlabel("Seconds")
         ax3.set_ylabel("Number of Instances")
         ax3.set_ylim(0,70)
         ax3.set_xlim(ax.get_xlim())
